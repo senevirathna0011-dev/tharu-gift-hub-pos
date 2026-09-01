@@ -1,0 +1,226 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #fdfbf9;
+  --foreground: #1c1917;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* ========================================================================= */
+/* PRINT ENGINE: 3-Inch Thermal Receipts, A4 Quotations & Sales Reports     */
+/* ========================================================================= */
+
+@media print {
+  /* Continuous roll configuration or auto for reports */
+  @page {
+    size: auto;
+    margin: 4mm;
+  }
+
+  /* Force exact color reproduction and disable browser shadows */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Hide everything on the page by default */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .no-print,
+  header,
+  nav,
+  button,
+  .print-hide {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* ------------------------------------------------------------------------- */
+  /* 1. THERMAL RECEIPT PRINT STYLES (Strict Single Continuous Page)          */
+  /* ------------------------------------------------------------------------- */
+  #receipt-print-area,
+  #receipt-print-area *,
+  #thermal-receipt-printable,
+  #thermal-receipt-printable * {
+    visibility: visible !important;
+  }
+
+  #receipt-print-area,
+  #thermal-receipt-printable,
+  .receipt-thermal-roll {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 80mm !important; /* Standard 3-inch thermal width */
+    max-width: 80mm !important;
+    min-width: 80mm !important;
+    margin: 0 !important;
+    padding: 1.5mm !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace !important;
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+    z-index: 999999 !important;
+    display: block !important;
+    height: fit-content !important;
+    max-height: 100% !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  #receipt-print-area *,
+  #thermal-receipt-printable * {
+    color: #000000 !important;
+    background-color: transparent !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .thermal-divider {
+    color: #000000 !important;
+    font-size: 8.5px !important;
+    line-height: 1 !important;
+    letter-spacing: -1px !important;
+    margin: 1px 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* ------------------------------------------------------------------------- */
+  /* 2. SALES REPORTS PRINT ENGINE                                             */
+  /* ------------------------------------------------------------------------- */
+  #report-print-area,
+  #report-print-area * {
+    visibility: visible !important;
+  }
+
+  #report-print-area {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  #report-print-area table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  #report-print-area th,
+  #report-print-area td {
+    color: #000000 !important;
+    border-bottom: 1px solid #e5e5e5 !important;
+    padding: 6px 8px !important;
+  }
+
+  /* ------------------------------------------------------------------------- */
+  /* 3. A4 PROFORMA INVOICE / QUOTATION PRINT STYLES                          */
+  /* ------------------------------------------------------------------------- */
+  #quotation-a4-printable,
+  #quotation-a4-printable * {
+    visibility: visible !important;
+  }
+
+  #quotation-a4-printable {
+    position: static !important;
+    width: 100% !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 6mm 8mm !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    display: block !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .quotation-modal-backdrop,
+  .quotation-modal-card,
+  .quotation-print-wrapper {
+    position: static !important;
+    display: block !important;
+    visibility: visible !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
