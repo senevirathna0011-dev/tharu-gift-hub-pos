@@ -65,11 +65,17 @@ export interface Product {
 export interface CatalogProduct {
   id: string;
   name: string;
+  sku?: string;
   category: string;
   sellingPrice: number;
   image?: string | null;
   description?: string | null;
   inStock: boolean;
+}
+
+export interface CatalogCartItem {
+  product: CatalogProduct;
+  quantity: number;
 }
 
 export interface Customer {

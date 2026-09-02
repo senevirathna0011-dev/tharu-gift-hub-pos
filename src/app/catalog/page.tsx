@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { CatalogProduct } from '@/lib/types';
+import { CatalogProduct, CatalogCartItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatters';
+import CatalogCartDrawer from '@/components/catalog/CatalogCartDrawer';
 import { 
   Search, 
   Gift, 
@@ -13,12 +14,13 @@ import {
   Phone, 
   MapPin, 
   Layers, 
-  SlidersHorizontal,
-  X,
-  ExternalLink,
-  ArrowUpDown,
-  ShoppingBag,
-  Info
+  X, 
+  ArrowUpDown, 
+  ShoppingBag, 
+  Plus, 
+  Minus, 
+  Check, 
+  Barcode
 } from 'lucide-react';
 
 interface StoreInfo {
@@ -48,6 +50,36 @@ export default function PublicCatalogPage() {
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'name'>('featured');
   const [selectedProduct, setSelectedProduct] = useState<CatalogProduct | null>(null);
+  const [modalQty, setModalQty] = useState<number>(1);
+
+  // Cart State
+  const [cart, setCart] = useState<CatalogCartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedCart = localStorage.getItem('tharu_catalog_cart');
+      if (savedCart) {
+        const parsed = JSON.parse(savedCart);
+        if (Array.isArray(parsed)) {
+          setCart(parsed);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load cart from localStorage:', err);
+    }
+  }, []);
+
+  // Persist cart to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('tharu_catalog_cart', JSON.stringify(cart));
+    } catch (err) {
+      console.error('Failed to save cart to localStorage:', err);
+    }
+  }, [cart]);
 
   // Fetch public catalog data
   useEffect(() => {
@@ -80,6 +112,7 @@ export default function PublicCatalogPage() {
         !searchQuery.trim() ||
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.sku && item.sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchesCategory =
@@ -102,14 +135,70 @@ export default function PublicCatalogPage() {
     return result;
   }, [products, searchQuery, selectedCategory, inStockOnly, sortBy]);
 
+  // Cart Management Functions
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((current) => (current === msg ? null : current));
+    }, 3000);
+  };
+
+  const addToCart = (product: CatalogProduct, quantity: number = 1) => {
+    if (!product.inStock) return;
+
+    setCart((prevCart) => {
+      const existingIndex = prevCart.findIndex((item) => item.product.id === product.id);
+      if (existingIndex > -1) {
+        const updated = [...prevCart];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          quantity: updated[existingIndex].quantity + quantity,
+        };
+        return updated;
+      } else {
+        return [...prevCart, { product, quantity }];
+      }
+    });
+
+    showToast(`Added ${quantity > 1 ? `${quantity}x ` : ''}"${product.name}" to cart`);
+  };
+
+  const updateQuantity = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+
+    setCart((prevCart) =>
+      prevCart.map((item) =>
+        item.product.id === productId ? { ...item, quantity } : item
+      )
+    );
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCart((prevCart) => prevCart.filter((item) => item.product.id !== productId));
+  };
+
+  const clearCart = () => {
+    setCart([]);
+  };
+
+  const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartGrandTotal = cart.reduce(
+    (sum, item) => sum + item.product.sellingPrice * item.quantity,
+    0
+  );
+
   // Helper for WhatsApp inquiry
   const handleWhatsAppInquiry = (product?: CatalogProduct) => {
-    const phoneClean = store.phone.replace(/[^0-9+]/g, '');
+    const phoneClean = store.phone ? store.phone.replace(/[^0-9+]/g, '') : '';
     let text = '';
     if (product) {
       const priceStr = formatCurrency(product.sellingPrice, store.currencySymbol || 'Rs.');
+      const barcodeStr = product.sku ? ` (Barcode: ${product.sku})` : '';
       text = encodeURIComponent(
-        `Hello ${store.shopName}! 🎁 I am interested in purchasing "${product.name}" (${priceStr}) from your online catalog. Is this currently available for pickup or delivery?`
+        `Hello ${store.shopName}! 🎁 I am interested in purchasing "${product.name}"${barcodeStr} (${priceStr}) from your online catalog. Is this currently available for pickup or delivery?`
       );
     } else {
       text = encodeURIComponent(
@@ -126,12 +215,12 @@ export default function PublicCatalogPage() {
   const currencySymbol = store.currencySymbol || 'Rs.';
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] text-stone-900 flex flex-col font-sans selection:bg-pink-100 selection:text-pink-900">
+    <div className="min-h-screen bg-[#FAF8F5] text-stone-900 flex flex-col font-sans selection:bg-pink-100 selection:text-pink-900 relative">
       
       {/* Top Boutique Announcement Bar */}
       <div className="bg-stone-900 text-stone-200 text-xs py-2 px-4 text-center flex items-center justify-center gap-2">
         <Sparkles className="w-3.5 h-3.5 text-pink-400 shrink-0" />
-        <span>Welcome to our Digital Gift Catalog. Scan, browse & inquire online!</span>
+        <span>Welcome to our Digital Gift Catalog. Browse gifts, build your cart & order directly on WhatsApp!</span>
       </div>
 
       {/* Main Store Banner / Header */}
@@ -159,15 +248,34 @@ export default function PublicCatalogPage() {
               </div>
             </div>
 
-            {/* Quick Contact Actions */}
-            <div className="flex items-center gap-2.5 shrink-0">
+            {/* Quick Contact & Cart Actions */}
+            <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+              
+              {/* Header Cart Button */}
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(true)}
+                className="relative flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-[0.98] text-white text-xs font-bold shadow-md shadow-stone-900/20 transition-all font-display cursor-pointer group"
+                title="View Shopping Cart"
+              >
+                <ShoppingBag className="w-4 h-4 text-pink-400 group-hover:scale-110 transition-transform" />
+                <span>Cart</span>
+                {totalCartItems > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-mono font-bold animate-in zoom-in-50">
+                    {totalCartItems}
+                  </span>
+                )}
+              </button>
+
               {store.phone && (
                 <button
+                  type="button"
                   onClick={() => handleWhatsAppInquiry()}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all font-display"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all font-display cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  <span>WhatsApp Shop</span>
+                  <span className="hidden sm:inline">WhatsApp Shop</span>
+                  <span className="sm:hidden">WhatsApp</span>
                 </button>
               )}
 
@@ -202,13 +310,13 @@ export default function PublicCatalogPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products by name or category..."
+                placeholder="Search products by name, barcode, or category..."
                 className="w-full pl-10 pr-10 py-2.5 bg-stone-50 hover:bg-stone-100/60 focus:bg-white rounded-2xl border border-stone-200 text-sm font-medium focus:outline-hidden focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition-all"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-3 p-0.5 text-stone-400 hover:text-stone-700 rounded-full hover:bg-stone-200"
+                  className="absolute right-3 top-3 p-0.5 text-stone-400 hover:text-stone-700 rounded-full hover:bg-stone-200 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -221,7 +329,7 @@ export default function PublicCatalogPage() {
               <button
                 type="button"
                 onClick={() => setInStockOnly(!inStockOnly)}
-                className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border text-xs font-semibold transition-all cursor-pointer ${
                   inStockOnly
                     ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs'
                     : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
@@ -252,7 +360,7 @@ export default function PublicCatalogPage() {
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
             <button
               onClick={() => setSelectedCategory('All')}
-              className={`px-4 py-2 rounded-2xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-2xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                 selectedCategory === 'All'
                   ? 'bg-rose-600 text-white shadow-md shadow-rose-600/25'
                   : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
@@ -274,7 +382,7 @@ export default function PublicCatalogPage() {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-2xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  className={`px-4 py-2 rounded-2xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                     isSelected
                       ? 'bg-rose-600 text-white shadow-md shadow-rose-600/25'
                       : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
@@ -316,7 +424,7 @@ export default function PublicCatalogPage() {
                 setSelectedCategory('All');
                 setInStockOnly(false);
               }}
-              className="text-pink-600 hover:text-pink-700 font-semibold underline text-xs"
+              className="text-pink-600 hover:text-pink-700 font-semibold underline text-xs cursor-pointer"
             >
               Reset Filters
             </button>
@@ -356,7 +464,7 @@ export default function PublicCatalogPage() {
                 setSelectedCategory('All');
                 setInStockOnly(false);
               }}
-              className="px-5 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/25 transition-all font-display"
+              className="px-5 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/25 transition-all font-display cursor-pointer"
             >
               View Full Collection
             </button>
@@ -365,6 +473,8 @@ export default function PublicCatalogPage() {
           /* Product Grid */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {filteredProducts.map((product) => {
+              const inCartItem = cart.find((item) => item.product.id === product.id);
+
               return (
                 <div
                   key={product.id}
@@ -372,7 +482,10 @@ export default function PublicCatalogPage() {
                 >
                   {/* Product Image Container */}
                   <div 
-                    onClick={() => setSelectedProduct(product)}
+                    onClick={() => {
+                      setSelectedProduct(product);
+                      setModalQty(1);
+                    }}
                     className="relative w-full aspect-square bg-stone-100 overflow-hidden cursor-pointer flex items-center justify-center"
                   >
                     {product.image ? (
@@ -411,6 +524,16 @@ export default function PublicCatalogPage() {
                         {product.category}
                       </span>
                     </div>
+
+                    {/* In Cart Indicator (Top Left) */}
+                    {inCartItem && (
+                      <div className="absolute top-3 left-3 animate-in fade-in zoom-in-75">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold shadow-md">
+                          <Check className="w-3 h-3" />
+                          <span>{inCartItem.quantity} in cart</span>
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Product Details */}
@@ -419,41 +542,84 @@ export default function PublicCatalogPage() {
                     <div>
                       {/* Product Name */}
                       <h3 
-                        onClick={() => setSelectedProduct(product)}
+                        onClick={() => {
+                          setSelectedProduct(product);
+                          setModalQty(1);
+                        }}
                         className="font-bold text-stone-900 text-sm sm:text-base leading-snug group-hover:text-rose-600 transition-colors line-clamp-2 cursor-pointer font-display"
                       >
                         {product.name}
                       </h3>
 
+                      {/* Barcode if available */}
+                      {product.sku && (
+                        <div className="mt-1 flex items-center gap-1 text-[10px] text-stone-400 font-mono">
+                          <Barcode className="w-3 h-3 text-stone-400" />
+                          <span>{product.sku}</span>
+                        </div>
+                      )}
+
                       {/* Description / Gift Notes */}
                       {product.description && (
-                        <p className="text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed">
+                        <p className="text-xs text-stone-500 mt-1.5 line-clamp-2 leading-relaxed">
                           {product.description}
                         </p>
                       )}
                     </div>
 
-                    {/* Price and WhatsApp Action */}
-                    <div className="pt-3 border-t border-stone-100 flex items-center justify-between gap-2">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-stone-400 block">
-                          Price
-                        </span>
-                        <div className="text-base sm:text-lg font-black text-stone-900 font-mono">
-                          {formatCurrency(product.sellingPrice, currencySymbol)}
+                    {/* Price and Cart Actions */}
+                    <div className="pt-3 border-t border-stone-100 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-stone-400 block">
+                            Price
+                          </span>
+                          <div className="text-base sm:text-lg font-black text-stone-900 font-mono">
+                            {formatCurrency(product.sellingPrice, currencySymbol)}
+                          </div>
                         </div>
+
+                        {/* WhatsApp Direct Inquire */}
+                        <button
+                          type="button"
+                          onClick={() => handleWhatsAppInquiry(product)}
+                          className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 hover:border-emerald-600 transition-all shadow-2xs cursor-pointer"
+                          title="Quick inquiry on WhatsApp"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </button>
                       </div>
 
-                      {/* WhatsApp Inquiry Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleWhatsAppInquiry(product)}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 hover:border-emerald-600 text-xs font-bold transition-all shadow-2xs"
-                        title="Inquire about this product on WhatsApp"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Inquire</span>
-                      </button>
+                      {/* Add to Cart Button */}
+                      {product.inStock ? (
+                        <button
+                          type="button"
+                          onClick={() => addToCart(product, 1)}
+                          className={`w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl text-xs font-bold transition-all shadow-sm cursor-pointer font-display ${
+                            inCartItem
+                              ? 'bg-stone-900 hover:bg-stone-800 text-white shadow-stone-900/10'
+                              : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/25 active:scale-[0.98]'
+                          }`}
+                        >
+                          <ShoppingBag className="w-4 h-4" />
+                          <span>{inCartItem ? 'Add More to Cart' : 'Add to Cart'}</span>
+                          {inCartItem && (
+                            <span className="ml-1 px-1.5 py-0.2 bg-white/20 rounded-full text-[10px] font-mono font-bold">
+                              +{inCartItem.quantity}
+                            </span>
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-stone-100 text-stone-400 text-xs font-semibold cursor-not-allowed"
+                        >
+                          <PackageX className="w-3.5 h-3.5" />
+                          <span>Out of Stock</span>
+                        </button>
+                      )}
+
                     </div>
 
                   </div>
@@ -464,6 +630,57 @@ export default function PublicCatalogPage() {
         )}
 
       </main>
+
+      {/* Floating Cart Button (Bottom Right) */}
+      <div className="fixed bottom-6 right-6 z-40 animate-in fade-in slide-in-from-bottom-5 duration-300">
+        <button
+          type="button"
+          onClick={() => setIsCartOpen(true)}
+          className="relative flex items-center gap-3 px-4 py-3 sm:px-5 sm:py-3.5 rounded-full bg-stone-900 hover:bg-stone-800 active:scale-95 text-white font-bold shadow-2xl shadow-stone-900/50 border border-stone-700 hover:border-pink-500/40 transition-all duration-200 cursor-pointer font-display group"
+          aria-label="Open Shopping Cart"
+        >
+          <div className="relative">
+            <ShoppingBag className="w-5 h-5 text-pink-400 group-hover:scale-110 transition-transform" />
+            {totalCartItems > 0 && (
+              <span className="absolute -top-2.5 -right-2.5 min-w-[20px] h-5 px-1 rounded-full bg-rose-500 text-white text-[10px] font-mono font-bold flex items-center justify-center shadow-md animate-bounce">
+                {totalCartItems}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col items-start leading-tight">
+            <span className="text-xs font-bold text-white tracking-wide">
+              {totalCartItems > 0 ? `${totalCartItems} ${totalCartItems === 1 ? 'item' : 'items'}` : 'View Cart'}
+            </span>
+            {totalCartItems > 0 && (
+              <span className="text-[11px] text-pink-300 font-mono font-bold">
+                LKR {cartGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            )}
+          </div>
+        </button>
+      </div>
+
+      {/* Quick Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-22 right-6 sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="bg-stone-900/95 text-white text-xs px-4 py-2.5 rounded-2xl shadow-xl border border-stone-700 backdrop-blur-md flex items-center gap-3 font-display">
+            <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <Check className="w-3.5 h-3.5" />
+            </div>
+            <span className="font-semibold">{toastMessage}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setToastMessage(null);
+                setIsCartOpen(true);
+              }}
+              className="text-pink-400 hover:text-pink-300 font-bold underline text-xs cursor-pointer ml-1"
+            >
+              View Cart
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Product Quick View Modal */}
       {selectedProduct && (
@@ -488,7 +705,7 @@ export default function PublicCatalogPage() {
 
               <button
                 onClick={() => setSelectedProduct(null)}
-                className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors backdrop-blur-xs"
+                className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors backdrop-blur-xs cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -522,6 +739,16 @@ export default function PublicCatalogPage() {
                   </div>
                 </div>
 
+                {/* Barcode */}
+                {selectedProduct.sku && (
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-stone-700 text-[11px] font-mono font-medium">
+                      <Barcode className="w-3.5 h-3.5 text-stone-400" />
+                      <span>{selectedProduct.sku}</span>
+                    </span>
+                  </div>
+                )}
+
                 <div className="text-2xl font-black text-rose-600 font-mono mt-2">
                   {formatCurrency(selectedProduct.sellingPrice, currencySymbol)}
                 </div>
@@ -538,12 +765,62 @@ export default function PublicCatalogPage() {
                 </div>
               )}
 
+              {/* Quantity Selector & Add to Cart (If in stock) */}
+              {selectedProduct.inStock && (
+                <div className="p-4 bg-pink-50/50 rounded-2xl border border-pink-100 flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold text-stone-700 font-display">
+                    Quantity:
+                  </span>
+                  <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-xl border border-stone-200 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setModalQty(Math.max(1, modalQty - 1))}
+                      className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-rose-100 hover:text-rose-600 text-stone-700 flex items-center justify-center transition-colors font-bold cursor-pointer"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="w-8 text-center text-sm font-bold font-mono text-stone-900">
+                      {modalQty}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setModalQty(modalQty + 1)}
+                      className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-rose-100 hover:text-rose-600 text-stone-700 flex items-center justify-center transition-colors font-bold cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-stone-400 block font-medium">Subtotal</span>
+                    <span className="text-sm font-black text-rose-600 font-mono">
+                      {formatCurrency(selectedProduct.sellingPrice * modalQty, currencySymbol)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
-              <div className="pt-2 flex items-center gap-3">
+              <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
+                {selectedProduct.inStock && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addToCart(selectedProduct, modalQty);
+                      setSelectedProduct(null);
+                    }}
+                    className="w-full sm:flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-lg shadow-rose-600/25 transition-all font-display cursor-pointer"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>Add to Cart</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => handleWhatsAppInquiry(selectedProduct)}
-                  className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 transition-all font-display"
+                  className={`w-full sm:flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 transition-all font-display cursor-pointer ${
+                    !selectedProduct.inStock ? 'w-full' : ''
+                  }`}
                 >
                   <MessageCircle className="w-4 h-4" />
                   <span>Inquire on WhatsApp</span>
@@ -552,7 +829,7 @@ export default function PublicCatalogPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedProduct(null)}
-                  className="px-4 py-3 rounded-2xl border border-stone-200 hover:bg-stone-100 text-stone-600 font-semibold text-xs transition-colors"
+                  className="w-full sm:w-auto px-4 py-3 rounded-2xl border border-stone-200 hover:bg-stone-100 text-stone-600 font-semibold text-xs transition-colors cursor-pointer"
                 >
                   Close
                 </button>
@@ -563,6 +840,17 @@ export default function PublicCatalogPage() {
           </div>
         </div>
       )}
+
+      {/* Cart Drawer Component */}
+      <CatalogCartDrawer
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart}
+        onUpdateQuantity={updateQuantity}
+        onRemoveItem={removeFromCart}
+        onClearCart={clearCart}
+        store={store}
+      />
 
       {/* Footer */}
       <footer className="bg-white border-t border-stone-200 mt-12">
