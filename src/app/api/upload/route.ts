@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import fs from 'fs/promises';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,48 +42,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure /public/uploads directory exists
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    await fs.mkdir(uploadsDir, { recursive: true });
-
-    // Determine safe file extension
-    let extension = path.extname(file.name).toLowerCase();
-    if (!extension) {
-      const mimeMap: Record<string, string> = {
-        'image/jpeg': '.jpg',
-        'image/png': '.png',
-        'image/webp': '.webp',
-        'image/gif': '.gif',
-        'image/svg+xml': '.svg',
-        'image/avif': '.avif',
-      };
-      extension = mimeMap[file.type] || '.jpg';
-    }
-
-    // Generate unique filename: product-<timestamp>-<random><ext>
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const fileName = `product-${timestamp}-${randomSuffix}${extension}`;
-    const filePath = path.join(uploadsDir, fileName);
-
-    // Write file to disk
+    // Convert file to Base64 data URL (serverless/Vercel compatible, avoids EROFS read-only disk issues)
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    await fs.writeFile(filePath, buffer);
-
-    const relativeUrl = `/uploads/${fileName}`;
+    const mimeType = file.type || 'image/jpeg';
+    const base64Data = buffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
     return NextResponse.json({
       success: true,
-      url: relativeUrl,
-      imageUrl: relativeUrl,
-      fileName,
+      url: dataUrl,
+      imageUrl: dataUrl,
+      fileName: file.name,
       size: file.size,
+      type: mimeType,
     });
   } catch (error: any) {
-    console.error('Error uploading product image:', error);
+    console.error('Error processing product image upload:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to upload image' },
+      { success: false, error: error.message || 'Failed to process image upload' },
       { status: 500 }
     );
   }

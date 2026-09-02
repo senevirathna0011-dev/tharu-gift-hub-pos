@@ -653,7 +653,7 @@ export default function ProductFormModal({
                     {isUploadingImage ? 'Uploading Image...' : 'Click to browse or drag & drop image'}
                   </span>
                   <p className="text-[11px] text-stone-500 mt-0.5">
-                    PNG, JPG, WebP, GIF, or SVG up to 10MB. Stored locally in <code className="text-pink-600 font-mono">/public/uploads/</code>
+                    PNG, JPG, WebP, GIF, or SVG up to 10MB. Automatically formatted for instant storage.
                   </p>
                 </div>
               </div>
