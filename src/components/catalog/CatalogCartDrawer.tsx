@@ -103,10 +103,11 @@ export default function CatalogCartDrawer({
     const message = `🛒 *New Order - ${shopTitle} Catalog*
 -----------------------------------
 ${itemsText}
+
 -----------------------------------
 💰 *Grand Total: LKR ${totalText}*
 
-Please process the order!`;
+Please process my order!`;
 
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = phoneClean
