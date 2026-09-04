@@ -54,6 +54,7 @@ export interface Product {
   minStockAlert: number;
   image?: string | null;
   imageUrl?: string | null;
+  images?: string[];
   description?: string | null;
   isPublic?: boolean;
   supplierId?: string | null;
@@ -69,6 +70,7 @@ export interface CatalogProduct {
   category: string;
   sellingPrice: number;
   image?: string | null;
+  images?: string[];
   description?: string | null;
   inStock: boolean;
 }
@@ -306,6 +308,8 @@ export interface DashboardStats {
   totalProductsCount: number;
   lowStockCount: number;
   outOfStockCount: number;
+  totalCatalogViews?: number;
+  lastCatalogView?: string | Date;
   recentSales: Sale[];
   topSellingProducts: {
     productName: string;
@@ -313,4 +317,11 @@ export interface DashboardStats {
     totalQuantity: number;
     totalRevenue: number;
   }[];
+}
+
+export interface CatalogAnalytics {
+  id: string;
+  totalViews: number;
+  lastViewedAt: string | Date;
+  updatedAt: string | Date;
 }

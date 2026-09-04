@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
       minStockAlert,
       image,
       imageUrl,
+      images,
       description,
       isPublic,
       supplierId,
@@ -88,6 +89,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize images array (max 5)
+    let finalImages: string[] = [];
+    if (Array.isArray(images) && images.length > 0) {
+      finalImages = images
+        .map((img: any) => (typeof img === 'string' ? img.trim() : ''))
+        .filter((img: string) => img.length > 0)
+        .slice(0, 5);
+    } else if (image || imageUrl) {
+      const single = (image || imageUrl)?.trim();
+      if (single) finalImages = [single];
+    }
+
+    const primaryImage = finalImages.length > 0 ? finalImages[0] : (image || imageUrl)?.trim() || null;
+
     const product = await prisma.product.create({
       data: {
         name: name.trim(),
@@ -97,7 +112,8 @@ export async function POST(request: NextRequest) {
         sellingPrice: Number(sellingPrice) || 0,
         stockQuantity: parseInt(stockQuantity, 10) || 0,
         minStockAlert: parseInt(minStockAlert, 10) || 5,
-        image: (image || imageUrl)?.trim() || null,
+        image: primaryImage,
+        images: finalImages,
         description: description?.trim() || null,
         isPublic: isPublic !== undefined ? Boolean(isPublic) : true,
         supplierId: supplierId?.trim() || null,

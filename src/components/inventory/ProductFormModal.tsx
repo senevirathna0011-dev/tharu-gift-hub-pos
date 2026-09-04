@@ -17,7 +17,11 @@ import {
   Loader2,
   Link as LinkIcon,
   Building2,
-  Globe
+  Globe,
+  Plus,
+  ArrowLeft,
+  ArrowRight,
+  Star
 } from 'lucide-react';
 
 interface ProductFormModalProps {
@@ -40,6 +44,8 @@ const CATEGORY_OPTIONS = [
   'Stationery & Journals',
 ];
 
+const MAX_PHOTOS = 5;
+
 export default function ProductFormModal({
   isOpen,
   onClose,
@@ -57,11 +63,12 @@ export default function ProductFormModal({
   const [supplierId, setSupplierId] = useState<string>('');
   const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
   
-  // Image handling
-  const [image, setImage] = useState('');
+  // Multi-Image State (Up to 5 images)
+  const [images, setImages] = useState<string[]>([]);
+  const [urlInput, setUrlInput] = useState<string>('');
   const [imageUploadMode, setImageUploadMode] = useState<'upload' | 'url'>('upload');
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string>('');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
 
@@ -109,10 +116,17 @@ export default function ProductFormModal({
         setMinStockAlert(initialProduct.minStockAlert);
         setSupplierId(initialProduct.supplierId || initialProduct.supplier?.id || '');
         
-        const initialImg = initialProduct.image || initialProduct.imageUrl || '';
-        setImage(initialImg);
-        setImagePreviewUrl(initialImg);
-        setImageUploadMode(initialImg.startsWith('http') ? 'url' : 'upload');
+        // Initialize images array from images or single image fallback
+        let initialImages: string[] = [];
+        if (Array.isArray(initialProduct.images) && initialProduct.images.length > 0) {
+          initialImages = [...initialProduct.images];
+        } else if (initialProduct.image || initialProduct.imageUrl) {
+          const single = (initialProduct.image || initialProduct.imageUrl)?.trim();
+          if (single) initialImages = [single];
+        }
+        setImages(initialImages.slice(0, MAX_PHOTOS));
+        setUrlInput('');
+        setImageUploadMode('upload');
         setDescription(initialProduct.description || '');
         setIsPublic(initialProduct.isPublic !== undefined ? initialProduct.isPublic : true);
       } else {
@@ -125,8 +139,8 @@ export default function ProductFormModal({
         setStockQuantity(10);
         setMinStockAlert(5);
         setSupplierId('');
-        setImage('');
-        setImagePreviewUrl('');
+        setImages([]);
+        setUrlInput('');
         setImageUploadMode('upload');
         setDescription('');
         setIsPublic(true);
@@ -135,6 +149,7 @@ export default function ProductFormModal({
       setUploadError('');
       setIsSaving(false);
       setIsUploadingImage(false);
+      setUploadProgressText('');
     }
   }, [isOpen, initialProduct]);
 
@@ -149,58 +164,77 @@ export default function ProductFormModal({
     setSku(generateSKU('GIFT'));
   };
 
-  // Upload local file to backend
-  const handleFileUpload = async (file: File) => {
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setUploadError('Please select a valid image file (JPEG, PNG, WebP, GIF, SVG, AVIF).');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('Image file is too large (max 10MB).');
-      return;
-    }
+  // Upload a batch of files to backend (up to remaining slots)
+  const handleFilesUpload = async (files: FileList | File[]) => {
+    const fileList = Array.from(files);
+    if (!fileList.length) return;
 
     setUploadError('');
-    setIsUploadingImage(true);
 
-    // Instant local thumbnail preview
-    const localBlobUrl = URL.createObjectURL(file);
-    setImagePreviewUrl(localBlobUrl);
+    const availableSlots = MAX_PHOTOS - images.length;
+    if (availableSlots <= 0) {
+      setUploadError(`Maximum of ${MAX_PHOTOS} photos allowed per product. Please remove an existing photo first.`);
+      return;
+    }
+
+    const filesToUpload = fileList.slice(0, availableSlots);
+    if (fileList.length > availableSlots) {
+      setUploadError(`Only ${availableSlots} more photo(s) can be added (maximum ${MAX_PHOTOS} photos total).`);
+    }
+
+    // Validate mime types and sizes
+    for (const f of filesToUpload) {
+      if (!f.type.startsWith('image/')) {
+        setUploadError(`"${f.name}" is not a valid image file. Please choose JPEG, PNG, WebP, GIF, or SVG.`);
+        return;
+      }
+      if (f.size > 10 * 1024 * 1024) {
+        setUploadError(`"${f.name}" exceeds the 10MB limit.`);
+        return;
+      }
+    }
+
+    setIsUploadingImage(true);
+    const uploadedUrls: string[] = [];
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        setUploadProgressText(`Uploading ${i + 1} of ${filesToUpload.length}...`);
 
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+        const formData = new FormData();
+        formData.append('file', file);
 
-      const data = await res.json();
-      if (data.success && data.url) {
-        setImage(data.url);
-        setImagePreviewUrl(data.url);
-      } else {
-        setUploadError(data.error || 'Failed to upload image to server');
-        setImage('');
-        setImagePreviewUrl('');
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await res.json();
+        if (data.success && data.url) {
+          uploadedUrls.push(data.url);
+        } else {
+          throw new Error(data.error || `Failed to upload "${file.name}"`);
+        }
       }
+
+      setImages((prev) => [...prev, ...uploadedUrls].slice(0, MAX_PHOTOS));
+      setUploadError('');
     } catch (err: any) {
-      setUploadError('Network error uploading file. Please try again.');
-      setImage('');
-      setImagePreviewUrl('');
+      console.error('Upload error:', err);
+      setUploadError(err.message || 'Error uploading photos. Please try again.');
     } finally {
       setIsUploadingImage(false);
+      setUploadProgressText('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFileUpload(file);
+    if (e.target.files && e.target.files.length > 0) {
+      handleFilesUpload(e.target.files);
     }
   };
 
@@ -216,26 +250,55 @@ export default function ProductFormModal({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleFileUpload(file);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesUpload(e.dataTransfer.files);
     }
   };
 
-  const handleRemoveImage = () => {
-    setImage('');
-    setImagePreviewUrl('');
-    setUploadError('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  // Add photo via direct URL
+  const handleAddUrl = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanUrl = urlInput.trim();
+    if (!cleanUrl) return;
+
+    if (images.length >= MAX_PHOTOS) {
+      setUploadError(`Maximum of ${MAX_PHOTOS} photos reached.`);
+      return;
     }
+
+    setImages((prev) => [...prev, cleanUrl].slice(0, MAX_PHOTOS));
+    setUrlInput('');
+    setUploadError('');
   };
 
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setImage(val);
-    setImagePreviewUrl(val);
+  // Remove individual photo
+  const handleRemoveImage = (indexToRemove: number) => {
+    setImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
     setUploadError('');
+  };
+
+  // Make cover (move to index 0)
+  const handleMakeCover = (index: number) => {
+    if (index <= 0 || index >= images.length) return;
+    setImages((prev) => {
+      const copy = [...prev];
+      const [item] = copy.splice(index, 1);
+      copy.unshift(item);
+      return copy;
+    });
+  };
+
+  // Move left / right
+  const handleMoveImage = (index: number, direction: 'left' | 'right') => {
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= images.length) return;
+    setImages((prev) => {
+      const copy = [...prev];
+      const temp = copy[index];
+      copy[index] = copy[targetIndex];
+      copy[targetIndex] = temp;
+      return copy;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -262,11 +325,13 @@ export default function ProductFormModal({
     }
 
     if (isUploadingImage) {
-      setErrorMsg('Please wait for the image upload to complete before saving.');
+      setErrorMsg('Please wait for photo uploads to finish before saving.');
       return;
     }
 
     setIsSaving(true);
+    const primaryImg = images.length > 0 ? images[0] : undefined;
+
     const payload: Partial<Product> = {
       name: name.trim(),
       sku: sku.trim(),
@@ -275,8 +340,9 @@ export default function ProductFormModal({
       sellingPrice: Number(sellingPrice) || 0,
       stockQuantity: parseInt(String(stockQuantity), 10) || 0,
       minStockAlert: parseInt(String(minStockAlert), 10) || 5,
-      image: image.trim() || undefined,
-      imageUrl: image.trim() || undefined,
+      image: primaryImg,
+      imageUrl: primaryImg,
+      images: images,
       description: description.trim() || undefined,
       isPublic,
       supplierId: supplierId ? supplierId.trim() : null,
@@ -303,7 +369,7 @@ export default function ProductFormModal({
                 {isEdit ? 'Edit Gift Item' : 'Add New Gift Product'}
               </h3>
               <p className="text-xs text-stone-500">
-                {isEdit ? 'Update product pricing, supplier, image, and inventory levels' : 'Enter product details to add to POS register'}
+                {isEdit ? 'Update product pricing, images (up to 5), supplier, and stock levels' : 'Enter product details and photos to add to POS register'}
               </p>
             </div>
           </div>
@@ -519,157 +585,235 @@ export default function ProductFormModal({
             </div>
           </div>
 
-          {/* PRODUCT IMAGE UPLOAD SECTION */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-stone-700">
-                Product Image
-              </label>
-              <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg text-[11px] font-semibold">
+          {/* MULTI-PRODUCT IMAGE SECTION (UP TO 5 PHOTOS) */}
+          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-stone-800">
+                  Product Photos (Up to 5)
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  images.length === MAX_PHOTOS
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-stone-200 text-stone-700'
+                }`}>
+                  {images.length} / {MAX_PHOTOS} photos
+                </span>
+              </div>
+
+              {/* Upload Mode Switcher */}
+              <div className="flex items-center gap-1 bg-stone-200/70 p-0.5 rounded-xl text-[11px] font-semibold">
                 <button
                   type="button"
                   onClick={() => setImageUploadMode('upload')}
-                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
+                  className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
                     imageUploadMode === 'upload'
                       ? 'bg-white text-stone-900 shadow-2xs'
-                      : 'text-stone-500 hover:text-stone-800'
+                      : 'text-stone-600 hover:text-stone-900'
                   }`}
                 >
                   <UploadCloud className="w-3.5 h-3.5" />
-                  <span>Upload File</span>
+                  <span>Upload Files</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setImageUploadMode('url')}
-                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
+                  className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
                     imageUploadMode === 'url'
                       ? 'bg-white text-stone-900 shadow-2xs'
-                      : 'text-stone-500 hover:text-stone-800'
+                      : 'text-stone-600 hover:text-stone-900'
                   }`}
                 >
                   <LinkIcon className="w-3.5 h-3.5" />
-                  <span>Image URL</span>
+                  <span>Add URL</span>
                 </button>
               </div>
             </div>
 
             {uploadError && (
-              <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+              <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{uploadError}</span>
               </div>
             )}
 
-            {/* If image is selected or already exists -> show preview card */}
-            {imagePreviewUrl ? (
-              <div className="relative flex items-center gap-4 p-3 bg-stone-50 rounded-2xl border border-stone-200">
-                {/* Thumbnail Preview */}
-                <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-stone-200 border border-stone-300 shrink-0 flex items-center justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={imagePreviewUrl}
-                    alt="Product Preview"
-                    className="w-full h-full object-cover"
-                    onError={() => {
-                      setUploadError('Unable to load image from given source.');
-                    }}
-                  />
-                  {isUploadingImage && (
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center text-white">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    </div>
-                  )}
-                </div>
+            {/* Existing Photos Grid */}
+            {images.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
+                {images.map((imgUrl, idx) => (
+                  <div
+                    key={`${imgUrl}-${idx}`}
+                    className={`group relative aspect-square rounded-2xl overflow-hidden border-2 bg-stone-100 flex flex-col justify-between shadow-2xs transition-all ${
+                      idx === 0
+                        ? 'border-rose-500 ring-2 ring-rose-500/20'
+                        : 'border-stone-200 hover:border-stone-300'
+                    }`}
+                  >
+                    {/* Image Preview */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imgUrl}
+                      alt={`Product photo ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-800">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="truncate">Image Ready</span>
-                  </div>
-                  <p className="text-[11px] text-stone-500 font-mono truncate mt-0.5">
-                    {image || imagePreviewUrl}
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
+                    {/* Cover Photo Badge (Top Left) */}
+                    <div className="absolute top-1.5 left-1.5 z-10">
+                      {idx === 0 ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-rose-600 text-white text-[9px] font-bold shadow-xs">
+                          <Star className="w-2.5 h-2.5 fill-white" />
+                          <span>Cover</span>
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded-md bg-stone-900/60 backdrop-blur-xs text-white text-[9px] font-mono font-semibold">
+                          #{idx + 1}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Delete Photo Button (Top Right) */}
                     <button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploadingImage}
-                      className="px-2.5 py-1 bg-white hover:bg-stone-100 text-stone-700 border border-stone-200 rounded-lg text-xs font-semibold transition-colors"
-                    >
-                      Change Photo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleRemoveImage}
-                      disabled={isUploadingImage}
-                      className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
+                      onClick={() => handleRemoveImage(idx)}
+                      className="absolute top-1.5 right-1.5 p-1 rounded-lg bg-stone-900/70 hover:bg-rose-600 text-white backdrop-blur-xs transition-colors shadow-xs cursor-pointer z-10"
+                      title="Remove photo"
                     >
                       <Trash2 className="w-3 h-3" />
-                      <span>Remove</span>
                     </button>
+
+                    {/* Reorder / Set Cover Overlay Bar (Bottom) */}
+                    <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center justify-between opacity-90 group-hover:opacity-100 transition-opacity z-10">
+                      {/* Move Left */}
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMoveImage(idx, 'left')}
+                        className="p-1 text-white hover:text-pink-300 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                        title="Move photo left"
+                      >
+                        <ArrowLeft className="w-3 h-3" />
+                      </button>
+
+                      {/* Make Cover Button if not already cover */}
+                      {idx !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleMakeCover(idx)}
+                          className="px-1.5 py-0.5 rounded bg-white/20 hover:bg-white/30 text-white text-[8px] font-bold uppercase tracking-wider backdrop-blur-xs cursor-pointer"
+                          title="Set as main cover photo"
+                        >
+                          Make Cover
+                        </button>
+                      )}
+
+                      {/* Move Right */}
+                      <button
+                        type="button"
+                        disabled={idx === images.length - 1}
+                        onClick={() => handleMoveImage(idx, 'right')}
+                        className="p-1 text-white hover:text-pink-300 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                        title="Move photo right"
+                      >
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ))}
 
-                {/* Hidden File Input */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </div>
-            ) : imageUploadMode === 'upload' ? (
-              /* Local File Drag & Drop Box */
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
-                  isDragging
-                    ? 'border-rose-500 bg-rose-50/50'
-                    : 'border-stone-200 hover:border-stone-400 bg-stone-50/50 hover:bg-stone-50'
-                }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-
-                <div className="w-12 h-12 rounded-2xl bg-white text-rose-600 shadow-sm flex items-center justify-center mb-2">
-                  {isUploadingImage ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <UploadCloud className="w-6 h-6" />
-                  )}
-                </div>
-
-                <div className="text-center">
-                  <span className="text-xs font-bold text-stone-800">
-                    {isUploadingImage ? 'Uploading Image...' : 'Click to browse or drag & drop image'}
-                  </span>
-                  <p className="text-[11px] text-stone-500 mt-0.5">
-                    PNG, JPG, WebP, GIF, or SVG up to 10MB. Automatically formatted for instant storage.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              /* External URL Input */
-              <div className="relative">
-                <ImageIcon className="w-4 h-4 text-stone-400 absolute left-3 top-3" />
-                <input
-                  type="url"
-                  value={image}
-                  onChange={handleUrlChange}
-                  placeholder="https://images.unsplash.com/photo-..."
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-white rounded-xl border border-stone-200 text-xs focus:border-rose-500"
-                />
+                {/* Add More Mini Tile (if under 5) */}
+                {images.length < MAX_PHOTOS && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (imageUploadMode === 'upload') {
+                        fileInputRef.current?.click();
+                      }
+                    }}
+                    className="aspect-square rounded-2xl border-2 border-dashed border-stone-300 hover:border-rose-400 hover:bg-rose-50/40 text-stone-500 hover:text-rose-600 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer p-2 text-center group"
+                  >
+                    <div className="w-7 h-7 rounded-xl bg-white shadow-2xs flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Plus className="w-4 h-4 text-rose-500" />
+                    </div>
+                    <span className="text-[10px] font-bold">Add Photo</span>
+                    <span className="text-[9px] text-stone-400">{MAX_PHOTOS - images.length} left</span>
+                  </button>
+                )}
               </div>
             )}
+
+            {/* Upload Area / Controls */}
+            {images.length < MAX_PHOTOS && (
+              <div className="pt-1">
+                {imageUploadMode === 'upload' ? (
+                  /* File Upload Drop Zone */
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`relative flex flex-col items-center justify-center p-5 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
+                      isDragging
+                        ? 'border-rose-500 bg-rose-50/60'
+                        : 'border-stone-300 hover:border-stone-400 bg-white hover:bg-stone-50/80'
+                    }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+
+                    <div className="w-10 h-10 rounded-2xl bg-pink-50 text-rose-600 shadow-2xs flex items-center justify-center mb-1.5">
+                      {isUploadingImage ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <UploadCloud className="w-5 h-5" />
+                      )}
+                    </div>
+
+                    <div className="text-center">
+                      <span className="text-xs font-bold text-stone-800">
+                        {isUploadingImage ? uploadProgressText || 'Uploading photos...' : 'Click or drag & drop up to 5 photos'}
+                      </span>
+                      <p className="text-[11px] text-stone-500 mt-0.5">
+                        PNG, JPG, WebP, GIF, or SVG up to 10MB each. Select multiple files at once.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  /* URL Input Form */
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <ImageIcon className="w-4 h-4 text-stone-400 absolute left-3 top-3" />
+                      <input
+                        type="url"
+                        value={urlInput}
+                        onChange={(e) => setUrlInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddUrl(e)}
+                        placeholder="Paste image URL (https://...)"
+                        className="w-full pl-9 pr-3.5 py-2.5 bg-white rounded-xl border border-stone-200 text-xs focus:border-rose-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAddUrl()}
+                      disabled={!urlInput.trim() || images.length >= MAX_PHOTOS}
+                      className="px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 disabled:opacity-40 text-white text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Add Photo
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Note about multi-image catalog */}
+            <p className="text-[11px] text-stone-400">
+              💡 The 1st photo is the primary cover image displayed in POS registers. Customers on the web catalog can browse all {MAX_PHOTOS} photos via carousel sliders.
+            </p>
           </div>
 
           {/* Description / Gift Notes */}

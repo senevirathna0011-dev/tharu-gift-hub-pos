@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
         category: true,
         sellingPrice: true,
         image: true,
+        images: true,
         description: true,
         stockQuantity: true,
       },
@@ -46,16 +47,24 @@ export async function GET(request: NextRequest) {
     });
 
     // Public sanitized model - NO exact stock numbers, NO cost prices
-    const products = rawProducts.map((p) => ({
-      id: p.id,
-      name: p.name,
-      sku: p.sku,
-      category: p.category,
-      sellingPrice: p.sellingPrice,
-      image: p.image || null,
-      description: p.description || null,
-      inStock: p.stockQuantity > 0,
-    }));
+    const products = rawProducts.map((p) => {
+      const productImages = (p.images && p.images.length > 0)
+        ? p.images
+        : (p.image ? [p.image] : []);
+      const primaryImage = productImages[0] || p.image || null;
+
+      return {
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        category: p.category,
+        sellingPrice: p.sellingPrice,
+        image: primaryImage,
+        images: productImages,
+        description: p.description || null,
+        inStock: p.stockQuantity > 0,
+      };
+    });
 
     // Extract all available public categories
     const allPublicProducts = await prisma.product.findMany({

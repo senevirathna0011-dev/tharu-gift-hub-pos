@@ -15,7 +15,9 @@ import {
   Award, 
   Sparkles, 
   Gift, 
-  ShieldAlert 
+  ShieldAlert,
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -87,12 +89,13 @@ export default function AnalyticsPage() {
           <Sparkles className="w-5 h-5 text-pink-500" />
         </h1>
         <p className="text-xs sm:text-sm text-stone-500 mt-1">
-          Daily sales trends, best-selling gift items, inventory asset valuation, and stock alerts.
+          Daily sales trends, best-selling gift items, catalog traffic, inventory asset valuation, and stock alerts.
         </p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Cards (5 Cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Today's Revenue */}
         <div className="p-5 bg-white rounded-3xl border border-stone-200 shadow-xs">
           <div className="flex items-center justify-between text-stone-500">
             <span className="text-xs font-bold uppercase tracking-wider">Today&apos;s Revenue</span>
@@ -108,6 +111,7 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {/* Units Sold Today */}
         <div className="p-5 bg-white rounded-3xl border border-stone-200 shadow-xs">
           <div className="flex items-center justify-between text-stone-500">
             <span className="text-xs font-bold uppercase tracking-wider">Units Sold Today</span>
@@ -126,9 +130,33 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {/* Total Catalog Views (Live Web Traffic Counter) */}
+        <div className="p-5 bg-white rounded-3xl border border-blue-100 shadow-xs">
+          <div className="flex items-center justify-between text-blue-700">
+            <span className="text-xs font-bold uppercase tracking-wider">Catalog Views</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Eye className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl sm:text-3xl font-black text-stone-900 font-display">
+              {(stats.totalCatalogViews || 0).toLocaleString()}
+            </div>
+            <Link
+              href="/catalog"
+              target="_blank"
+              className="text-xs text-blue-600 hover:text-blue-700 font-semibold mt-1 inline-flex items-center gap-1 hover:underline"
+            >
+              <span>Live Store Traffic</span>
+              <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Inventory Asset Value */}
         <div className="p-5 bg-white rounded-3xl border border-stone-200 shadow-xs">
           <div className="flex items-center justify-between text-stone-500">
-            <span className="text-xs font-bold uppercase tracking-wider">Inventory Asset Value</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Inventory Value</span>
             <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
               <Package className="w-4 h-4" />
             </div>
@@ -137,10 +165,11 @@ export default function AnalyticsPage() {
             <div className="text-2xl sm:text-3xl font-black text-stone-900 font-display">
               {formatMoney(stats.totalInventoryValue)}
             </div>
-            <p className="text-xs text-stone-400 mt-1">Across {stats.totalProductsCount} gift SKUs</p>
+            <p className="text-xs text-stone-400 mt-1">Across {stats.totalProductsCount} SKUs</p>
           </div>
         </div>
 
+        {/* Low Stock Items */}
         <div className="p-5 bg-white rounded-3xl border border-amber-200 shadow-xs">
           <div className="flex items-center justify-between text-amber-700">
             <span className="text-xs font-bold uppercase tracking-wider">Low Stock Items</span>

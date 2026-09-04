@@ -190,10 +190,10 @@ export default function InventoryTable({
                     <td className="py-3 px-4 sm:px-6">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-stone-100 overflow-hidden shrink-0 flex items-center justify-center border border-stone-200">
-                          {(product.image || product.imageUrl) ? (
+                          {(product.image || product.imageUrl || product.images?.[0]) ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={(product.image || product.imageUrl)!}
+                              src={(product.image || product.imageUrl || product.images?.[0])!}
                               alt={product.name}
                               className="w-full h-full object-cover"
                             />

@@ -62,6 +62,13 @@ export async function GET() {
       include: { items: true },
     });
 
+    // 5. Catalog analytics / views
+    const catalogAnalytics = await prisma.catalogAnalytics.findUnique({
+      where: { id: 'default' },
+    });
+    const totalCatalogViews = catalogAnalytics?.totalViews || 0;
+    const lastCatalogView = catalogAnalytics?.lastViewedAt || null;
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -72,6 +79,8 @@ export async function GET() {
         totalProductsCount,
         lowStockCount,
         outOfStockCount,
+        totalCatalogViews,
+        lastCatalogView,
         topSellingProducts,
         recentSales,
       },

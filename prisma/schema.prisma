@@ -37,6 +37,7 @@ model Product {
   stockQuantity Int               @default(0)
   minStockAlert Int               @default(5)
   image         String?
+  images        String[]          @default([])
   description   String?
   isPublic      Boolean           @default(true)
   supplierId    String?
@@ -223,3 +224,11 @@ model User {
 
   @@index([username])
 }
+
+model CatalogAnalytics {
+  id           String   @id @default("default")
+  totalViews   Int      @default(0)
+  lastViewedAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+

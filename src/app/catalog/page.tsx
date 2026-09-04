@@ -4,12 +4,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { CatalogProduct, CatalogCartItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatters';
 import CatalogCartDrawer from '@/components/catalog/CatalogCartDrawer';
+import CatalogProductCard from '@/components/catalog/CatalogProductCard';
+import CatalogQuickViewModal from '@/components/catalog/CatalogQuickViewModal';
 import { 
   Search, 
   Gift, 
   Sparkles, 
   CheckCircle2, 
-  PackageX, 
   MessageCircle, 
   Phone, 
   MapPin, 
@@ -17,10 +18,7 @@ import {
   X, 
   ArrowUpDown, 
   ShoppingBag, 
-  Plus, 
-  Minus, 
-  Check, 
-  Barcode
+  Check
 } from 'lucide-react';
 
 interface StoreInfo {
@@ -49,13 +47,30 @@ export default function PublicCatalogPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'name'>('featured');
+  
+  // Quick View Modal state
   const [selectedProduct, setSelectedProduct] = useState<CatalogProduct | null>(null);
-  const [modalQty, setModalQty] = useState<number>(1);
+  const [initialModalPhotoIndex, setInitialModalPhotoIndex] = useState<number>(0);
 
   // Cart State
   const [cart, setCart] = useState<CatalogCartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // 1. Automatically increment catalog view counter on visit or page refresh
+  useEffect(() => {
+    const recordCatalogView = async () => {
+      try {
+        await fetch('/api/catalog/view', {
+          method: 'POST',
+        });
+      } catch (err) {
+        console.error('Failed to increment catalog view counter:', err);
+      }
+    };
+
+    recordCatalogView();
+  }, []);
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -184,6 +199,11 @@ export default function PublicCatalogPage() {
     setCart([]);
   };
 
+  const handleOpenQuickView = (product: CatalogProduct, initialIndex: number = 0) => {
+    setSelectedProduct(product);
+    setInitialModalPhotoIndex(initialIndex);
+  };
+
   const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartGrandTotal = cart.reduce(
     (sum, item) => sum + item.product.sellingPrice * item.quantity,
@@ -212,15 +232,13 @@ export default function PublicCatalogPage() {
     window.open(whatsappUrl, '_blank');
   };
 
-  const currencySymbol = store.currencySymbol || 'Rs.';
-
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-stone-900 flex flex-col font-sans selection:bg-pink-100 selection:text-pink-900 relative">
       
       {/* Top Boutique Announcement Bar */}
       <div className="bg-stone-900 text-stone-200 text-xs py-2 px-4 text-center flex items-center justify-center gap-2">
         <Sparkles className="w-3.5 h-3.5 text-pink-400 shrink-0" />
-        <span>Welcome to our Digital Gift Catalog. Browse gifts, build your cart & order directly on WhatsApp!</span>
+        <span>Welcome to our Digital Gift Catalog. Browse gifts, view multi-angle photos & order on WhatsApp!</span>
       </div>
 
       {/* Main Store Banner / Header */}
@@ -470,160 +488,21 @@ export default function PublicCatalogPage() {
             </button>
           </div>
         ) : (
-          /* Product Grid */
+          /* Product Grid with Multi-Photo Slider */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {filteredProducts.map((product) => {
               const inCartItem = cart.find((item) => item.product.id === product.id);
 
               return (
-                <div
+                <CatalogProductCard
                   key={product.id}
-                  className="bg-white rounded-3xl border border-stone-200/80 shadow-xs hover:shadow-xl hover:border-pink-200 transition-all duration-300 flex flex-col overflow-hidden group"
-                >
-                  {/* Product Image Container */}
-                  <div 
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setModalQty(1);
-                    }}
-                    className="relative w-full aspect-square bg-stone-100 overflow-hidden cursor-pointer flex items-center justify-center"
-                  >
-                    {product.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-stone-300">
-                        <Gift className="w-12 h-12 text-pink-300 mb-1" />
-                        <span className="text-[11px] font-semibold text-stone-400 font-display">Tharu Gift Hub</span>
-                      </div>
-                    )}
-
-                    {/* Stock Status Badge (Top Right) */}
-                    <div className="absolute top-3 right-3">
-                      {product.inStock ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-xs text-emerald-700 text-[10px] font-bold shadow-sm border border-emerald-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          <span>In Stock</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-xs text-stone-600 text-[10px] font-bold shadow-sm border border-stone-200">
-                          <PackageX className="w-3 h-3 text-stone-400" />
-                          <span>Out of Stock</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Category Pill (Bottom Left) */}
-                    <div className="absolute bottom-3 left-3">
-                      <span className="px-2.5 py-1 rounded-xl bg-black/60 backdrop-blur-xs text-white text-[10px] font-semibold">
-                        {product.category}
-                      </span>
-                    </div>
-
-                    {/* In Cart Indicator (Top Left) */}
-                    {inCartItem && (
-                      <div className="absolute top-3 left-3 animate-in fade-in zoom-in-75">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold shadow-md">
-                          <Check className="w-3 h-3" />
-                          <span>{inCartItem.quantity} in cart</span>
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Product Details */}
-                  <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3">
-                    
-                    <div>
-                      {/* Product Name */}
-                      <h3 
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setModalQty(1);
-                        }}
-                        className="font-bold text-stone-900 text-sm sm:text-base leading-snug group-hover:text-rose-600 transition-colors line-clamp-2 cursor-pointer font-display"
-                      >
-                        {product.name}
-                      </h3>
-
-                      {/* Barcode if available */}
-                      {product.sku && (
-                        <div className="mt-1 flex items-center gap-1 text-[10px] text-stone-400 font-mono">
-                          <Barcode className="w-3 h-3 text-stone-400" />
-                          <span>{product.sku}</span>
-                        </div>
-                      )}
-
-                      {/* Description / Gift Notes */}
-                      {product.description && (
-                        <p className="text-xs text-stone-500 mt-1.5 line-clamp-2 leading-relaxed">
-                          {product.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Price and Cart Actions */}
-                    <div className="pt-3 border-t border-stone-100 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-stone-400 block">
-                            Price
-                          </span>
-                          <div className="text-base sm:text-lg font-black text-stone-900 font-mono">
-                            {formatCurrency(product.sellingPrice, currencySymbol)}
-                          </div>
-                        </div>
-
-                        {/* WhatsApp Direct Inquire */}
-                        <button
-                          type="button"
-                          onClick={() => handleWhatsAppInquiry(product)}
-                          className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 hover:border-emerald-600 transition-all shadow-2xs cursor-pointer"
-                          title="Quick inquiry on WhatsApp"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {/* Add to Cart Button */}
-                      {product.inStock ? (
-                        <button
-                          type="button"
-                          onClick={() => addToCart(product, 1)}
-                          className={`w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl text-xs font-bold transition-all shadow-sm cursor-pointer font-display ${
-                            inCartItem
-                              ? 'bg-stone-900 hover:bg-stone-800 text-white shadow-stone-900/10'
-                              : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/25 active:scale-[0.98]'
-                          }`}
-                        >
-                          <ShoppingBag className="w-4 h-4" />
-                          <span>{inCartItem ? 'Add More to Cart' : 'Add to Cart'}</span>
-                          {inCartItem && (
-                            <span className="ml-1 px-1.5 py-0.2 bg-white/20 rounded-full text-[10px] font-mono font-bold">
-                              +{inCartItem.quantity}
-                            </span>
-                          )}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled
-                          className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-stone-100 text-stone-400 text-xs font-semibold cursor-not-allowed"
-                        >
-                          <PackageX className="w-3.5 h-3.5" />
-                          <span>Out of Stock</span>
-                        </button>
-                      )}
-
-                    </div>
-
-                  </div>
-                </div>
+                  product={product}
+                  inCartItem={inCartItem}
+                  currencySymbol={store.currencySymbol || 'Rs.'}
+                  onOpenQuickView={handleOpenQuickView}
+                  onAddToCart={addToCart}
+                  onWhatsAppInquiry={handleWhatsAppInquiry}
+                />
               );
             })}
           </div>
@@ -682,164 +561,15 @@ export default function PublicCatalogPage() {
         </div>
       )}
 
-      {/* Product Quick View Modal */}
-      {selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col my-8 animate-in fade-in zoom-in-95 duration-150">
-            
-            {/* Modal Image */}
-            <div className="relative w-full aspect-video sm:aspect-4/3 bg-stone-100 flex items-center justify-center overflow-hidden">
-              {selectedProduct.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={selectedProduct.image}
-                  alt={selectedProduct.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center text-stone-300">
-                  <Gift className="w-16 h-16 text-pink-300 mb-2" />
-                  <span className="text-xs font-semibold text-stone-400 font-display">Tharu Gift Hub</span>
-                </div>
-              )}
-
-              <button
-                onClick={() => setSelectedProduct(null)}
-                className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors backdrop-blur-xs cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="absolute bottom-3 left-3">
-                <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-xs text-white text-xs font-semibold">
-                  {selectedProduct.category}
-                </span>
-              </div>
-            </div>
-
-            {/* Modal Info */}
-            <div className="p-6 space-y-4">
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-xl font-bold text-stone-900 font-display">
-                    {selectedProduct.name}
-                  </h2>
-                  <div className="shrink-0">
-                    {selectedProduct.inStock ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>In Stock</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-stone-100 text-stone-600 text-xs font-semibold">
-                        <PackageX className="w-3.5 h-3.5 text-stone-400" />
-                        <span>Out of Stock</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Barcode */}
-                {selectedProduct.sku && (
-                  <div className="mt-1 flex items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-stone-700 text-[11px] font-mono font-medium">
-                      <Barcode className="w-3.5 h-3.5 text-stone-400" />
-                      <span>{selectedProduct.sku}</span>
-                    </span>
-                  </div>
-                )}
-
-                <div className="text-2xl font-black text-rose-600 font-mono mt-2">
-                  {formatCurrency(selectedProduct.sellingPrice, currencySymbol)}
-                </div>
-              </div>
-
-              {selectedProduct.description && (
-                <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block mb-1">
-                    Product Description
-                  </span>
-                  <p className="text-xs sm:text-sm text-stone-700 leading-relaxed whitespace-pre-line">
-                    {selectedProduct.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Quantity Selector & Add to Cart (If in stock) */}
-              {selectedProduct.inStock && (
-                <div className="p-4 bg-pink-50/50 rounded-2xl border border-pink-100 flex items-center justify-between gap-3">
-                  <span className="text-xs font-bold text-stone-700 font-display">
-                    Quantity:
-                  </span>
-                  <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-xl border border-stone-200 shadow-2xs">
-                    <button
-                      type="button"
-                      onClick={() => setModalQty(Math.max(1, modalQty - 1))}
-                      className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-rose-100 hover:text-rose-600 text-stone-700 flex items-center justify-center transition-colors font-bold cursor-pointer"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-8 text-center text-sm font-bold font-mono text-stone-900">
-                      {modalQty}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setModalQty(modalQty + 1)}
-                      className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-rose-100 hover:text-rose-600 text-stone-700 flex items-center justify-center transition-colors font-bold cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-stone-400 block font-medium">Subtotal</span>
-                    <span className="text-sm font-black text-rose-600 font-mono">
-                      {formatCurrency(selectedProduct.sellingPrice * modalQty, currencySymbol)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
-                {selectedProduct.inStock && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      addToCart(selectedProduct, modalQty);
-                      setSelectedProduct(null);
-                    }}
-                    className="w-full sm:flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-lg shadow-rose-600/25 transition-all font-display cursor-pointer"
-                  >
-                    <ShoppingBag className="w-4 h-4" />
-                    <span>Add to Cart</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => handleWhatsAppInquiry(selectedProduct)}
-                  className={`w-full sm:flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 transition-all font-display cursor-pointer ${
-                    !selectedProduct.inStock ? 'w-full' : ''
-                  }`}
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Inquire on WhatsApp</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedProduct(null)}
-                  className="w-full sm:w-auto px-4 py-3 rounded-2xl border border-stone-200 hover:bg-stone-100 text-stone-600 font-semibold text-xs transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-
-            </div>
-
-          </div>
-        </div>
-      )}
+      {/* Product Quick View Modal with Multi-Image Carousel & Thumbnail Selector */}
+      <CatalogQuickViewModal
+        product={selectedProduct}
+        initialIndex={initialModalPhotoIndex}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={addToCart}
+        onWhatsAppInquiry={handleWhatsAppInquiry}
+        currencySymbol={store.currencySymbol || 'Rs.'}
+      />
 
       {/* Cart Drawer Component */}
       <CatalogCartDrawer

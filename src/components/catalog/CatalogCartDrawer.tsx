@@ -207,10 +207,10 @@ Please process the order!`;
                       <div className="flex items-start gap-3">
                         {/* Thumbnail */}
                         <div className="w-16 h-16 rounded-xl bg-stone-100 overflow-hidden shrink-0 flex items-center justify-center border border-stone-100">
-                          {item.product.image ? (
+                          {(item.product.image || item.product.images?.[0]) ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={item.product.image}
+                              src={(item.product.image || item.product.images?.[0])!}
                               alt={item.product.name}
                               className="w-full h-full object-cover"
                             />

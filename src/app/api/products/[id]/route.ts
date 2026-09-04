@@ -45,12 +45,32 @@ export async function PUT(
       minStockAlert,
       image,
       imageUrl,
+      images,
       description,
       isPublic,
       supplierId,
     } = body;
 
-    const finalImage = image !== undefined ? image : imageUrl;
+    // Normalize images array (max 5) if provided
+    let finalImages: string[] | undefined = undefined;
+    let finalImage: string | null | undefined = undefined;
+
+    if (images !== undefined) {
+      if (Array.isArray(images)) {
+        finalImages = images
+          .map((img: any) => (typeof img === 'string' ? img.trim() : ''))
+          .filter((img: string) => img.length > 0)
+          .slice(0, 5);
+        finalImage = finalImages.length > 0 ? finalImages[0] : null;
+      } else {
+        finalImages = [];
+        finalImage = null;
+      }
+    } else if (image !== undefined || imageUrl !== undefined) {
+      const single = (image !== undefined ? image : imageUrl)?.trim() || null;
+      finalImage = single;
+      finalImages = single ? [single] : [];
+    }
 
     // Check if SKU is used by another product
     if (sku) {
@@ -75,7 +95,8 @@ export async function PUT(
         ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
         ...(stockQuantity !== undefined && { stockQuantity: parseInt(stockQuantity, 10) }),
         ...(minStockAlert !== undefined && { minStockAlert: parseInt(minStockAlert, 10) }),
-        ...(finalImage !== undefined && { image: finalImage?.trim() || null }),
+        ...(finalImage !== undefined && { image: finalImage }),
+        ...(finalImages !== undefined && { images: finalImages }),
         ...(description !== undefined && { description: description?.trim() || null }),
         ...(isPublic !== undefined && { isPublic: Boolean(isPublic) }),
         ...(supplierId !== undefined && { supplierId: supplierId?.trim() || null }),
