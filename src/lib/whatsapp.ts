@@ -2,6 +2,15 @@ import { Sale, Quotation, StoreSettings } from '@/lib/types';
 import { formatDate, formatCurrency, formatItemNameWithWarranty } from '@/lib/formatters';
 
 /**
+ * Checks if the current browser environment is a mobile device (Android / iOS).
+ */
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || navigator.vendor || (window as any).opera || '';
+  return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile/i.test(ua);
+}
+
+/**
  * Formats a clean, itemized invoice message for WhatsApp sharing without any web/Vercel URLs.
  */
 export function generateWhatsAppInvoiceText(
@@ -81,7 +90,7 @@ export function generateWhatsAppQuotationText(
 }
 
 /**
- * Cleans phone number and formats it for WhatsApp URL.
+ * Cleans phone number and formats it for WhatsApp Web URL.
  * Automatically handles standard Sri Lankan mobile prefixes (07X -> 947X) if applicable.
  */
 export function cleanPhoneNumberForWhatsApp(phone: string): string {
@@ -112,8 +121,8 @@ export function cleanPhoneNumberForWhatsApp(phone: string): string {
 }
 
 /**
- * Builds direct WhatsApp Web URL.
- * Formats as https://web.whatsapp.com/send?phone=PHONE_NUMBER&text=ENCODED_TEXT
+ * Strictly builds direct WhatsApp Web URL: https://web.whatsapp.com/send
+ * This avoids OS desktop application protocol handlers (such as wa.me or api.whatsapp.com).
  */
 export function getWhatsAppShareUrl(phone: string, text: string): string {
   const cleaned = cleanPhoneNumberForWhatsApp(phone);
@@ -136,8 +145,8 @@ export interface SharePdfOptions {
 
 /**
  * Handles PDF sharing via WhatsApp:
- * - Mobile (Web Share API with file support): Shares the PDF file directly via native share sheet / WhatsApp.
- * - Desktop / Fallback: Triggers auto-download of the PDF and simultaneously opens WhatsApp Web.
+ * - Mobile (Android/iOS with Web Share API file support): Shares the PDF file directly via native share sheet / WhatsApp.
+ * - Desktop: Strictly opens WhatsApp Web (https://web.whatsapp.com/send) in a new browser tab and simultaneously auto-downloads the PDF.
  */
 export async function sharePdfDocumentViaWhatsApp({
   phone,
@@ -148,62 +157,63 @@ export async function sharePdfDocumentViaWhatsApp({
   onDesktopFallback,
   onMobileShared,
 }: SharePdfOptions): Promise<void> {
-  let fileToShare: File | null = null;
-  try {
-    fileToShare = new File([pdfBlob], fileName, { type: 'application/pdf' });
-  } catch (e) {
-    // Some older environments may not support File constructor with blob
-    fileToShare = null;
-  }
+  const isMobile = isMobileDevice();
 
-  let mobileShareSuccessful = false;
-
-  if (
-    fileToShare &&
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    typeof navigator.canShare === 'function'
-  ) {
+  if (isMobile) {
+    let fileToShare: File | null = null;
     try {
-      if (navigator.canShare({ files: [fileToShare] })) {
-        await navigator.share({
-          files: [fileToShare],
-          title: dialogTitle,
-          text: text,
-        });
-        mobileShareSuccessful = true;
-        if (onMobileShared) {
-          onMobileShared();
+      fileToShare = new File([pdfBlob], fileName, { type: 'application/pdf' });
+    } catch (e) {
+      fileToShare = null;
+    }
+
+    if (
+      fileToShare &&
+      typeof navigator !== 'undefined' &&
+      typeof navigator.share === 'function' &&
+      typeof navigator.canShare === 'function'
+    ) {
+      try {
+        if (navigator.canShare({ files: [fileToShare] })) {
+          await navigator.share({
+            files: [fileToShare],
+            title: dialogTitle,
+            text: text,
+          });
+          if (onMobileShared) {
+            onMobileShared();
+          }
+          return;
         }
-        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          // User voluntarily dismissed share sheet
+          return;
+        }
+        console.warn('Mobile file share failed, falling back to desktop flow:', err);
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        // User voluntarily dismissed share sheet
-        return;
-      }
-      console.warn('Navigator file share failed, falling back to desktop auto-download:', err);
     }
   }
 
-  if (!mobileShareSuccessful) {
-    // 1. Auto-download the PDF to local storage
-    const blobUrl = URL.createObjectURL(pdfBlob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  // Desktop Flow (Strict WhatsApp Web in browser tab + Auto-download PDF)
+  // 1. Strictly construct WhatsApp Web URL
+  const waUrl = getWhatsAppShareUrl(phone, text);
 
-    // 2. Simultaneously open WhatsApp Web
-    const waUrl = getWhatsAppShareUrl(phone, text);
-    window.open(waUrl, '_blank', 'noopener,noreferrer');
+  // 2. Open WhatsApp Web in a new tab immediately in response to the user click
+  window.open(waUrl, '_blank', 'noopener,noreferrer');
 
-    // 3. Trigger fallback notification
-    if (onDesktopFallback) {
-      onDesktopFallback();
-    }
+  // 3. Simultaneously auto-download the PDF to local device
+  const blobUrl = URL.createObjectURL(pdfBlob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+
+  // 4. Trigger feedback notification
+  if (onDesktopFallback) {
+    onDesktopFallback();
   }
 }
