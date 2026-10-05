@@ -77,7 +77,7 @@ export default function PublicInvoicePage() {
     generateInvoicePDF(sale, settings);
   };
 
-  const handleShareWhatsApp = async () => {
+  const handleShareWhatsApp = () => {
     if (!sale) return;
     const settings = storeSettings || {
       shopName: 'Tharu Gift Hub',
@@ -92,34 +92,6 @@ export default function PublicInvoicePage() {
     const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
     const invoiceText = generateWhatsAppInvoiceText(sale, settings, currentUrl);
     const phone = sale.customerPhone || sale.customer?.phone || '';
-
-    // If Web Share API with files is supported on mobile
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        const pdfBlob = createInvoicePDFBlob(sale, settings);
-        const pdfFile = new File([pdfBlob], `Invoice-${sale.receiptNo}.pdf`, {
-          type: 'application/pdf',
-        });
-
-        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-          await navigator.share({
-            title: `Invoice #${sale.receiptNo}`,
-            text: invoiceText,
-            files: [pdfFile],
-          });
-          return;
-        } else {
-          await navigator.share({
-            title: `Invoice #${sale.receiptNo}`,
-            text: invoiceText,
-            url: currentUrl,
-          });
-          return;
-        }
-      } catch (err) {
-        // Fallback to direct wa.me link
-      }
-    }
 
     const waUrl = getWhatsAppShareUrl(phone, invoiceText);
     window.open(waUrl, '_blank', 'noopener,noreferrer');

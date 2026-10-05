@@ -12,15 +12,17 @@ import CustomerQuickSelectModal from '@/components/customers/CustomerQuickSelect
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import CashierShiftModal from '@/components/pos/CashierShiftModal';
 import SalesReturnModal from '@/components/pos/SalesReturnModal';
+import ScreenLockModal from '@/components/pos/ScreenLockModal';
+import { useIdleTimer } from '@/hooks/useIdleTimer';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/context/AuthContext';
 import { useSettings } from '@/context/SettingsContext';
 import confetti from 'canvas-confetti';
-import { Clock, RotateCcw } from 'lucide-react';
+import { Clock, RotateCcw, Lock } from 'lucide-react';
 
 export default function POSPage() {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
+  const { currentUser, logout, openSwitchModal } = useAuth();
   const { settings } = useSettings();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -56,6 +58,23 @@ export default function POSPage() {
   // Quotation Modal
   const [isQuotationOpen, setIsQuotationOpen] = useState(false);
   const [generatedQuotation, setGeneratedQuotation] = useState<Quotation | null>(null);
+
+  // POS Idle / Inactivity Screen Lock State (2 minutes timeout)
+  const [isScreenLocked, setIsScreenLocked] = useState<boolean>(false);
+
+  const { resetTimer } = useIdleTimer({
+    timeoutMs: 120000, // 2 minutes inactivity timeout
+    enabled: !!currentUser && !isScreenLocked,
+    onIdle: () => {
+      setIsScreenLocked(true);
+    },
+  });
+
+  const handleUnlockScreen = () => {
+    setIsScreenLocked(false);
+    resetTimer();
+    toast('POS Register unlocked! Ready for billing.', 'success');
+  };
 
   // Fetch products
   const fetchProducts = useCallback(async () => {
@@ -375,6 +394,18 @@ export default function POSPage() {
               <span className="hidden md:inline">Sales Return / Refund</span>
               <span className="md:hidden">Return</span>
             </button>
+
+            {/* Manual Screen Lock Button */}
+            <button
+              type="button"
+              onClick={() => setIsScreenLocked(true)}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-100 text-stone-600 hover:text-stone-900 text-xs font-bold transition-all shadow-2xs shrink-0 font-display cursor-pointer"
+              title="Lock POS register screen"
+            >
+              <Lock className="w-4 h-4 text-stone-500" />
+              <span className="hidden md:inline">Lock Screen</span>
+              <span className="md:hidden">Lock</span>
+            </button>
           </div>
 
           {/* Catalog Grid */}
@@ -488,6 +519,17 @@ export default function POSPage() {
         onReturnProcessed={() => {
           fetchProducts();
         }}
+      />
+
+      {/* Inactivity & Manual Screen Lock Modal */}
+      <ScreenLockModal
+        isOpen={isScreenLocked}
+        user={currentUser}
+        cart={cart}
+        customerName={selectedCustomer ? selectedCustomer.name : (customerName || 'Walk-in Customer')}
+        onUnlock={handleUnlockScreen}
+        onSwitchUser={openSwitchModal}
+        onLogout={logout}
       />
     </div>
   );

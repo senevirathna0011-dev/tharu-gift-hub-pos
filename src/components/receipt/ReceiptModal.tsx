@@ -64,46 +64,17 @@ export default function ReceiptModal({
     });
   }, []);
 
-  const handleShareWhatsApp = useCallback(async () => {
+  const handleShareWhatsApp = useCallback(() => {
     if (!sale) return;
     const phoneToUse = customPhone.trim() || sale.customerPhone || sale.customer?.phone || '';
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const invoiceUrl = origin ? `${origin}/invoice/${sale.id}` : '';
     const invoiceText = generateWhatsAppInvoiceText(sale, settings, invoiceUrl);
 
-    // On mobile devices supporting Web Share API with files:
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        setIsSharingPdf(true);
-        const pdfBlob = createInvoicePDFBlob(sale, settings);
-        const pdfFile = new File([pdfBlob], `Invoice-${sale.receiptNo}.pdf`, {
-          type: 'application/pdf',
-        });
-
-        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-          await navigator.share({
-            title: `Invoice #${sale.receiptNo} - ${settings.shopName || 'Tharu Gift Hub'}`,
-            text: invoiceText,
-            files: [pdfFile],
-          });
-          toast('Invoice PDF shared successfully!', 'success');
-          return;
-        }
-      } catch (err: any) {
-        if (err?.name === 'AbortError') {
-          // User cancelled native share modal
-          return;
-        }
-        console.warn('Native share failed, falling back to direct WhatsApp link', err);
-      } finally {
-        setIsSharingPdf(false);
-      }
-    }
-
-    // Direct WhatsApp web/app link fallback
+    // Direct WhatsApp Web link
     const url = getWhatsAppShareUrl(phoneToUse, invoiceText);
     window.open(url, '_blank', 'noopener,noreferrer');
-    toast('Opening WhatsApp with itemized invoice & link...', 'info');
+    toast('Opening WhatsApp Web with itemized invoice & link...', 'info');
   }, [sale, customPhone, settings, toast]);
 
   const handleCopyWhatsAppText = useCallback(() => {
