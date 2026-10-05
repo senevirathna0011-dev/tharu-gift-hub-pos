@@ -15,14 +15,18 @@ interface SettingsContextType {
 const defaultSettings: StoreSettings = {
   shopName: 'Tharu Gift Hub',
   shopTagline: 'Curated Gifts, Keepsakes & Heartfelt Moments',
+  shopLogo: null,
   address: '452 Velvet Lane, Suite 100, West District',
   phone: '+1 (555) 839-4438',
   email: 'hello@blissandbloomgifts.com',
   currencySymbol: '$',
   currencyCode: 'USD',
   taxRate: 0.08,
+  headerNote: 'Welcome to Tharu Gift Hub',
+  footerNote: 'Thank you for shopping with us! Visit again. ✨',
   receiptFooter: 'Thank you for shopping with us! Visit again. ✨',
-  receiptNote: 'Items in original condition can be exchanged within 14 days with this receipt.',
+  receiptNote: 'Items in original condition can be exchanged within 14 days with receipt.',
+  showLogoOnReceipt: true,
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

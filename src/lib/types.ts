@@ -16,14 +16,18 @@ export interface StoreSettings {
   id?: string;
   shopName: string;
   shopTagline?: string | null;
+  shopLogo?: string | null;
   address: string;
   phone: string;
   email?: string | null;
   currencySymbol: string;
   currencyCode: string;
   taxRate: number;
+  headerNote?: string | null;
+  footerNote?: string | null;
   receiptFooter: string;
   receiptNote?: string | null;
+  showLogoOnReceipt?: boolean;
   updatedAt?: string | Date;
 }
 

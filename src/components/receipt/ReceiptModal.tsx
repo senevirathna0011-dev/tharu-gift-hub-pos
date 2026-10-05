@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Sale } from '@/lib/types';
 import ThermalReceipt from './ThermalReceipt';
 import { useSettings } from '@/context/SettingsContext';
-import { generateInvoicePDF } from '@/lib/pdfInvoice';
+import { generateInvoicePDF, createInvoicePDFBlob } from '@/lib/pdfInvoice';
 import { 
   generateWhatsAppInvoiceText, 
   getWhatsAppShareUrl, 
@@ -23,7 +23,8 @@ import {
   Check, 
   ExternalLink,
   Sparkles,
-  FileDown
+  FileDown,
+  Globe
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -46,6 +47,7 @@ export default function ReceiptModal({
   const [customPhone, setCustomPhone] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+  const [isSharingPdf, setIsSharingPdf] = useState<boolean>(false);
 
   useEffect(() => {
     if (sale) {
@@ -62,20 +64,53 @@ export default function ReceiptModal({
     });
   }, []);
 
-  const handleShareWhatsApp = useCallback(() => {
+  const handleShareWhatsApp = useCallback(async () => {
     if (!sale) return;
     const phoneToUse = customPhone.trim() || sale.customerPhone || sale.customer?.phone || '';
-    const invoiceText = generateWhatsAppInvoiceText(sale, settings);
-    const url = getWhatsAppShareUrl(phoneToUse, invoiceText);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const invoiceUrl = origin ? `${origin}/invoice/${sale.id}` : '';
+    const invoiceText = generateWhatsAppInvoiceText(sale, settings, invoiceUrl);
 
-    // Open WhatsApp in new tab / window
+    // On mobile devices supporting Web Share API with files:
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        setIsSharingPdf(true);
+        const pdfBlob = createInvoicePDFBlob(sale, settings);
+        const pdfFile = new File([pdfBlob], `Invoice-${sale.receiptNo}.pdf`, {
+          type: 'application/pdf',
+        });
+
+        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+          await navigator.share({
+            title: `Invoice #${sale.receiptNo} - ${settings.shopName || 'Tharu Gift Hub'}`,
+            text: invoiceText,
+            files: [pdfFile],
+          });
+          toast('Invoice PDF shared successfully!', 'success');
+          return;
+        }
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          // User cancelled native share modal
+          return;
+        }
+        console.warn('Native share failed, falling back to direct WhatsApp link', err);
+      } finally {
+        setIsSharingPdf(false);
+      }
+    }
+
+    // Direct WhatsApp web/app link fallback
+    const url = getWhatsAppShareUrl(phoneToUse, invoiceText);
     window.open(url, '_blank', 'noopener,noreferrer');
-    toast('Opening WhatsApp with itemized invoice...', 'info');
+    toast('Opening WhatsApp with itemized invoice & link...', 'info');
   }, [sale, customPhone, settings, toast]);
 
   const handleCopyWhatsAppText = useCallback(() => {
     if (!sale) return;
-    const invoiceText = generateWhatsAppInvoiceText(sale, settings);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const invoiceUrl = origin ? `${origin}/invoice/${sale.id}` : '';
+    const invoiceText = generateWhatsAppInvoiceText(sale, settings, invoiceUrl);
     navigator.clipboard.writeText(invoiceText);
     setCopied(true);
     toast('Invoice text copied to clipboard!', 'success');
@@ -99,6 +134,8 @@ export default function ReceiptModal({
   if (!isOpen || !sale) return null;
 
   const effectivePhone = customPhone.trim() || sale.customerPhone || sale.customer?.phone || '';
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const onlineInvoiceUrl = origin ? `${origin}/invoice/${sale.id}` : `/invoice/${sale.id}`;
 
   return (
     <div className="print-receipt-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/60 backdrop-blur-sm overflow-y-auto">
@@ -145,7 +182,7 @@ export default function ReceiptModal({
                   <span>WhatsApp Invoice</span>
                 </div>
                 <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                  Instant
+                  PDF & Text
                 </span>
               </div>
 
@@ -180,8 +217,9 @@ export default function ReceiptModal({
                 <button
                   type="button"
                   onClick={handleShareWhatsApp}
-                  className="flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all font-display"
-                  title="Open WhatsApp chat with pre-filled itemized invoice"
+                  disabled={isSharingPdf}
+                  className="flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all font-display disabled:opacity-60"
+                  title="Share invoice with PDF and web link via WhatsApp"
                 >
                   <Share2 className="w-3.5 h-3.5" />
                   <span>Share via WhatsApp</span>
@@ -202,7 +240,7 @@ export default function ReceiptModal({
                   ) : (
                     <>
                       <Copy className="w-3.5 h-3.5 text-stone-500" />
-                      <span className="text-[11px]">Copy Text</span>
+                      <span className="text-[11px]">Copy</span>
                     </>
                   )}
                 </button>
@@ -251,7 +289,7 @@ export default function ReceiptModal({
                   <div className="text-left">
                     <div>Download PDF Invoice</div>
                     <div className="text-[10px] font-normal text-stone-500">
-                      Official A4 Brand Document
+                      Official A4 Brand Document with Logo
                     </div>
                   </div>
                 </div>
@@ -259,6 +297,20 @@ export default function ReceiptModal({
                   PDF
                 </span>
               </button>
+
+              {/* Online Web Invoice Link */}
+              <a
+                href={onlineInvoiceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-between p-2.5 rounded-2xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-semibold text-xs transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Globe className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="truncate">View Public Online Invoice Page</span>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+              </a>
             </div>
 
             {/* Customer & Order Summary Badge */}

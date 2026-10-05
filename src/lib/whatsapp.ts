@@ -2,11 +2,12 @@ import { Sale, StoreSettings } from '@/lib/types';
 import { formatDate, formatCurrency } from '@/lib/formatters';
 
 /**
- * Formats a clean, readable text invoice for WhatsApp sharing.
+ * Formats a clean, itemized invoice message for WhatsApp sharing with optional online PDF link.
  */
 export function generateWhatsAppInvoiceText(
   sale: Sale,
-  settings: StoreSettings
+  settings: StoreSettings,
+  invoiceUrl?: string
 ): string {
   const shopName = settings.shopName || 'Tharu Gift Hub';
   const currencySymbol = settings.currencySymbol || 'LKR';
@@ -23,6 +24,10 @@ export function generateWhatsAppInvoiceText(
 
   const grandTotalFormatted = formatCurrency(sale.totalAmount, currencySymbol);
 
+  const onlineLinkSection = invoiceUrl 
+    ? `\n📄 *View / Download PDF Invoice Online:*\n${invoiceUrl}\n` 
+    : '';
+
   return `🧾 *${shopName} - Official Invoice*
 ----------------------------------
 Invoice No: #${invoiceNo}
@@ -34,7 +39,7 @@ ${itemsLines}
 
 ----------------------------------
 💰 *Grand Total: ${grandTotalFormatted}*
-
+${onlineLinkSection}
 Thank you for shopping with ${shopName}!`;
 }
 

@@ -197,19 +197,25 @@ model QuotationItem {
   @@index([quotationId])
 }
 
-model Setting {
-  id             String   @id @default("default")
-  shopName       String   @default("Tharu Gift Hub")
-  shopTagline    String?  @default("Curated Gifts, Keepsakes & Heartfelt Moments")
-  address        String   @default("452 Velvet Lane, Suite 100, West District")
-  phone          String   @default("+1 (555) 839-4438")
-  email          String?  @default("hello@blissandbloomgifts.com")
-  currencySymbol String   @default("$")
-  currencyCode   String   @default("USD")
-  taxRate        Float    @default(0.08)
-  receiptFooter  String   @default("Thank you for shopping with us! Visit again. ✨")
-  receiptNote    String?  @default("Items in original condition can be exchanged within 14 days with receipt.")
-  updatedAt      DateTime @updatedAt
+model StoreSettings {
+  id                String   @id @default("default")
+  shopName          String   @default("Tharu Gift Hub")
+  shopTagline       String?  @default("Curated Gifts, Keepsakes & Heartfelt Moments")
+  shopLogo          String?
+  address           String   @default("452 Velvet Lane, Suite 100, West District")
+  phone             String   @default("+1 (555) 839-4438")
+  email             String?  @default("hello@blissandbloomgifts.com")
+  currencySymbol    String   @default("$")
+  currencyCode      String   @default("USD")
+  taxRate           Float    @default(0.08)
+  headerNote        String?  @default("Welcome to Tharu Gift Hub")
+  footerNote        String?  @default("Thank you for shopping with us! Visit again. ✨")
+  receiptFooter     String   @default("Thank you for shopping with us! Visit again. ✨")
+  receiptNote       String?  @default("Items in original condition can be exchanged within 14 days with receipt.")
+  showLogoOnReceipt Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+
+  @@map("StoreSettings")
 }
 
 model User {

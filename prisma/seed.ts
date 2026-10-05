@@ -168,7 +168,7 @@ async function main() {
   console.log('Seeding Tharu Gift Hub database...');
 
   // 1. Upsert default settings
-  await prisma.setting.upsert({
+  await prisma.storeSettings.upsert({
     where: { id: 'default' },
     update: {},
     create: {

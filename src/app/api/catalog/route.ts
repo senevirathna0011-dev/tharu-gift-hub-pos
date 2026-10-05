@@ -74,10 +74,11 @@ export async function GET(request: NextRequest) {
     const categories = Array.from(new Set(allPublicProducts.map((p) => p.category))).sort();
 
     // Fetch store branding info
-    const setting = await prisma.setting.findFirst();
+    const setting = await prisma.storeSettings.findFirst();
     const storeInfo = {
       shopName: setting?.shopName || 'Tharu Gift Hub',
       shopTagline: setting?.shopTagline || 'Curated Gifts, Keepsakes & Heartfelt Moments',
+      shopLogo: setting?.shopLogo || null,
       address: setting?.address || '',
       phone: setting?.phone || '',
       email: setting?.email || '',

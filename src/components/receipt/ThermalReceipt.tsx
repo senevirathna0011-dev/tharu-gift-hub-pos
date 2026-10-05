@@ -20,7 +20,11 @@ export default function ThermalReceipt({
   const storeTagline = settings.shopTagline || 'Curated Gifts & Heartfelt Moments';
   const storeAddress = settings.address || '452 Velvet Lane, West District';
   const storePhone = settings.phone || '+1 (555) 839-4438';
-  const receiptFooter = settings.receiptFooter || 'Thank you for shopping with us! Visit again. ✨';
+  const storeEmail = settings.email || '';
+  const storeLogo = settings.shopLogo;
+  const showLogo = settings.showLogoOnReceipt !== false && !!storeLogo;
+  const headerNote = settings.headerNote;
+  const receiptFooter = settings.footerNote || settings.receiptFooter || 'Thank you for shopping with us! Visit again. ✨';
   const receiptNote = settings.receiptNote || 'Items in original condition can be exchanged within 14 days with this receipt.';
   const currency = settings.currencySymbol || '$';
 
@@ -34,6 +38,18 @@ export default function ThermalReceipt({
     >
       {/* STORE HEADER */}
       <div className="text-center pb-0.5">
+        {/* SHOP LOGO */}
+        {showLogo && storeLogo && (
+          <div className="flex justify-center mb-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={storeLogo}
+              alt={storeName}
+              className="max-h-12 max-w-[45mm] object-contain filter grayscale contrast-125"
+            />
+          </div>
+        )}
+
         <div className="text-[13px] font-extrabold tracking-wider uppercase leading-snug">
           {storeName}
         </div>
@@ -44,6 +60,12 @@ export default function ThermalReceipt({
         )}
         <div className="text-[9.5px] text-stone-800 mt-0.5">{storeAddress}</div>
         <div className="text-[9.5px] text-stone-800">Tel: {storePhone}</div>
+        {storeEmail && <div className="text-[8.5px] text-stone-700">{storeEmail}</div>}
+        {headerNote && (
+          <div className="text-[9px] font-semibold text-stone-900 mt-1 italic">
+            {headerNote}
+          </div>
+        )}
       </div>
 
       {/* DASHED DIVIDER */}
