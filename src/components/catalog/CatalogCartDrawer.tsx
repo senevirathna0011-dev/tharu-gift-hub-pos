@@ -2,6 +2,8 @@
 
 import React, { useEffect } from 'react';
 import { CatalogCartItem } from '@/lib/types';
+import { formatItemNameWithWarranty } from '@/lib/formatters';
+import { getWhatsAppShareUrl } from '@/lib/whatsapp';
 import { 
   X, 
   Trash2, 
@@ -11,7 +13,8 @@ import {
   MessageCircle, 
   Barcode, 
   Gift, 
-  ArrowRight
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 
 interface StoreInfo {
@@ -82,13 +85,12 @@ export default function CatalogCartDrawer({
   const handleSendWhatsAppOrder = () => {
     if (cart.length === 0) return;
 
-    const phoneClean = store.phone ? store.phone.replace(/[^0-9+]/g, '') : '';
     const shopTitle = store.shopName || 'Tharu Gift Hub';
 
     const itemsText = cart
       .map((item, index) => {
         const itemNumber = index + 1;
-        const name = item.product.name;
+        const name = formatItemNameWithWarranty(item.product.name, item.product.warranty);
         const barcode = item.product.sku || 'N/A';
         const qty = item.quantity;
         const price = formatLKR(item.product.sellingPrice);
@@ -109,12 +111,8 @@ ${itemsText}
 
 Please process my order!`;
 
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = phoneClean
-      ? `https://wa.me/${phoneClean}?text=${encodedMessage}`
-      : `https://wa.me/?text=${encodedMessage}`;
-
-    window.open(whatsappUrl, '_blank');
+    const whatsappUrl = getWhatsAppShareUrl(store.phone, message);
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -236,7 +234,7 @@ Please process my order!`;
                             </button>
                           </div>
 
-                          {/* Barcode Tag */}
+                          {/* Barcode & Warranty Tags */}
                           <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-stone-700 text-[10px] font-mono font-medium">
                               <Barcode className="w-3 h-3 text-stone-400" />
@@ -245,6 +243,12 @@ Please process my order!`;
                             <span className="text-[10px] text-stone-500 font-medium">
                               {item.product.category}
                             </span>
+                            {item.product.warranty && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200/60">
+                                <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>{item.product.warranty} Warranty</span>
+                              </span>
+                            )}
                           </div>
 
                           {/* Unit Price */}

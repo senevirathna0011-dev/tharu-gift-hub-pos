@@ -57,7 +57,7 @@ export default function ShareCatalogModal({ isOpen, onClose }: ShareCatalogModal
     const text = encodeURIComponent(
       `Hello! 🎁 Explore our online digital gift catalog & current collection from ${shopName}:\n${catalogUrl}`
     );
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    window.open(`https://web.whatsapp.com/send?text=${text}`, '_blank', 'noopener,noreferrer');
   };
 
   const handleDownloadQR = () => {

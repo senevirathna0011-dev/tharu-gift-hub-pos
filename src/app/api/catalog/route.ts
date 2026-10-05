@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
         image: true,
         images: true,
         description: true,
+        warranty: true,
         stockQuantity: true,
       },
       orderBy: [
@@ -62,6 +63,7 @@ export async function GET(request: NextRequest) {
         image: primaryImage,
         images: productImages,
         description: p.description || null,
+        warranty: p.warranty || null,
         inStock: p.stockQuantity > 0,
       };
     });

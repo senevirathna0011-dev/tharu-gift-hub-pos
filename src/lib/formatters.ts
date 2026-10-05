@@ -47,3 +47,20 @@ export function generateSKU(prefix: string = 'GIFT'): string {
   const randomNum = Math.floor(100000 + Math.random() * 900000);
   return `${prefix}-${randomNum}`;
 }
+
+/**
+ * Formats item name to include warranty period if present.
+ * Example: "Bluetooth Speaker" + "6 Months" -> "Bluetooth Speaker (6 Months Warranty)"
+ */
+export function formatItemNameWithWarranty(
+  name: string,
+  warranty?: string | null
+): string {
+  if (!warranty || !warranty.trim()) return name;
+  const cleanWarranty = warranty.trim();
+  if (name.toLowerCase().includes('warranty')) {
+    return name;
+  }
+  return `${name} (${cleanWarranty} Warranty)`;
+}
+

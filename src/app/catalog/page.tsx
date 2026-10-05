@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { CatalogProduct, CatalogCartItem } from '@/lib/types';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, formatItemNameWithWarranty } from '@/lib/formatters';
+import { getWhatsAppShareUrl } from '@/lib/whatsapp';
 import CatalogCartDrawer from '@/components/catalog/CatalogCartDrawer';
 import CatalogProductCard from '@/components/catalog/CatalogProductCard';
 import CatalogQuickViewModal from '@/components/catalog/CatalogQuickViewModal';
@@ -212,24 +213,18 @@ export default function PublicCatalogPage() {
 
   // Helper for WhatsApp inquiry
   const handleWhatsAppInquiry = (product?: CatalogProduct) => {
-    const phoneClean = store.phone ? store.phone.replace(/[^0-9+]/g, '') : '';
     let text = '';
     if (product) {
+      const displayName = formatItemNameWithWarranty(product.name, product.warranty);
       const priceStr = formatCurrency(product.sellingPrice, store.currencySymbol || 'Rs.');
       const barcodeStr = product.sku ? ` (Barcode: ${product.sku})` : '';
-      text = encodeURIComponent(
-        `Hello ${store.shopName}! 🎁 I am interested in purchasing "${product.name}"${barcodeStr} (${priceStr}) from your online catalog. Is this currently available for pickup or delivery?`
-      );
+      text = `Hello ${store.shopName}! 🎁 I am interested in purchasing "${displayName}"${barcodeStr} (${priceStr}) from your online catalog. Is this currently available for pickup or delivery?`;
     } else {
-      text = encodeURIComponent(
-        `Hello ${store.shopName}! 🎁 I am browsing your online catalog and have a general question about your gift collection.`
-      );
+      text = `Hello ${store.shopName}! 🎁 I am browsing your online catalog and have a general question about your gift collection.`;
     }
 
-    const whatsappUrl = phoneClean
-      ? `https://wa.me/${phoneClean}?text=${text}`
-      : `https://wa.me/?text=${text}`;
-    window.open(whatsappUrl, '_blank');
+    const whatsappUrl = getWhatsAppShareUrl(store.phone, text);
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (

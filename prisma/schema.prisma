@@ -39,6 +39,7 @@ model Product {
   image         String?
   images        String[]          @default([])
   description   String?
+  warranty      String?
   isPublic      Boolean           @default(true)
   supplierId    String?
   supplier      Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)

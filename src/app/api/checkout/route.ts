@@ -64,9 +64,13 @@ export async function POST(request: NextRequest) {
       const itemSubtotal = +(unitPrice * item.quantity).toFixed(2);
       subtotal += itemSubtotal;
 
+      const displayName = product.warranty?.trim()
+        ? `${product.name} (${product.warranty.trim()} Warranty)`
+        : product.name;
+
       return {
         productId: product.id,
-        productName: product.name,
+        productName: displayName,
         productSku: product.sku,
         quantity: item.quantity,
         unitPrice,

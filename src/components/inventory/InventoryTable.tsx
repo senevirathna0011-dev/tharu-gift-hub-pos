@@ -16,7 +16,8 @@ import {
   Gift,
   Lock,
   Globe,
-  EyeOff
+  EyeOff,
+  ShieldCheck
 } from 'lucide-react';
 
 interface InventoryTableProps {
@@ -201,8 +202,16 @@ export default function InventoryTable({
                             <Gift className="w-5 h-5 text-pink-400" />
                           )}
                         </div>
-                        <div>
-                          <div className="font-bold text-stone-900 line-clamp-1">{product.name}</div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-stone-900 line-clamp-1">{product.name}</span>
+                            {product.warranty && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200/60" title={`${product.warranty} Warranty Included`}>
+                                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                <span>{product.warranty}</span>
+                              </span>
+                            )}
+                          </div>
                           {product.description && (
                             <div className="text-[11px] text-stone-400 line-clamp-1">
                               {product.description}

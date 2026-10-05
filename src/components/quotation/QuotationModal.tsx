@@ -2,7 +2,8 @@
 
 import React, { useCallback } from 'react';
 import { Quotation } from '@/lib/types';
-import { formatDate, formatCurrency } from '@/lib/formatters';
+import { formatDate, formatCurrency, formatItemNameWithWarranty } from '@/lib/formatters';
+import { generateWhatsAppQuotationText, getWhatsAppShareUrl } from '@/lib/whatsapp';
 import { useSettings } from '@/context/SettingsContext';
 import { 
   X, 
@@ -15,7 +16,8 @@ import {
   Calendar, 
   Clock, 
   ShieldAlert,
-  Download
+  Download,
+  Share2
 } from 'lucide-react';
 
 interface QuotationModalProps {
@@ -38,6 +40,14 @@ export default function QuotationModal({
       }, 50);
     });
   }, []);
+
+  const handleShareWhatsApp = useCallback(() => {
+    if (!quotation) return;
+    const phone = quotation.customerPhone || quotation.customer?.phone || '';
+    const text = generateWhatsAppQuotationText(quotation, settings);
+    const url = getWhatsAppShareUrl(phone, text);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, [quotation, settings]);
 
   if (!isOpen || !quotation) return null;
 
@@ -66,6 +76,14 @@ export default function QuotationModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleShareWhatsApp}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all font-display cursor-pointer"
+              title="Share quotation estimate via WhatsApp"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Share via WhatsApp</span>
+            </button>
             <button
               onClick={handlePrint}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-rose-600/25 transition-all font-display"
@@ -192,7 +210,7 @@ export default function QuotationModal({
                         {idx + 1}
                       </td>
                       <td className="py-3 px-3 font-bold text-stone-900">
-                        {item.productName}
+                        {formatItemNameWithWarranty(item.productName, item.warranty)}
                       </td>
                       <td className="py-3 px-3 font-mono text-stone-500 text-[11px]">
                         {item.productSku}

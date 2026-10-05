@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Sale } from '@/lib/types';
-import { formatCurrency, formatDate } from '@/lib/formatters';
+import { formatCurrency, formatDate, formatItemNameWithWarranty } from '@/lib/formatters';
 import { useSettings } from '@/context/SettingsContext';
 
 interface ThermalReceiptProps {
@@ -120,7 +120,9 @@ export default function ThermalReceipt({
       <div className="py-0.5 space-y-1">
         {sale.items.map((item, index) => (
           <div key={item.id || index} className="text-[9.5px] leading-tight">
-            <div className="font-bold text-black break-words">{item.productName}</div>
+            <div className="font-bold text-black break-words">
+              {formatItemNameWithWarranty(item.productName, item.warranty)}
+            </div>
             <div className="flex justify-between items-center text-stone-800 text-[9px]">
               <span className="w-[45%] text-stone-600 font-sans text-[8px] truncate">
                 {item.productSku}

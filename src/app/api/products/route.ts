@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       imageUrl,
       images,
       description,
+      warranty,
       isPublic,
       supplierId,
     } = body;
@@ -115,6 +116,7 @@ export async function POST(request: NextRequest) {
         image: primaryImage,
         images: finalImages,
         description: description?.trim() || null,
+        warranty: warranty?.trim() || null,
         isPublic: isPublic !== undefined ? Boolean(isPublic) : true,
         supplierId: supplierId?.trim() || null,
       },

@@ -16,7 +16,8 @@ import {
   ShoppingBag, 
   MessageCircle, 
   Images,
-  Sparkles
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 
 interface CatalogQuickViewModalProps {
@@ -217,15 +218,21 @@ export default function CatalogQuickViewModal({
               </div>
             </div>
 
-            {/* Barcode */}
-            {product.sku && (
-              <div className="mt-1 flex items-center gap-1.5">
+            {/* Barcode & Warranty */}
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              {product.sku && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-stone-700 text-[11px] font-mono font-medium">
                   <Barcode className="w-3.5 h-3.5 text-stone-400" />
                   <span>{product.sku}</span>
                 </span>
-              </div>
-            )}
+              )}
+              {product.warranty && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[11px] font-semibold border border-emerald-200/70">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{product.warranty} Warranty</span>
+                </span>
+              )}
+            </div>
 
             <div className="text-2xl font-black text-rose-600 font-mono mt-2">
               {formatCurrency(product.sellingPrice, currencySymbol)}

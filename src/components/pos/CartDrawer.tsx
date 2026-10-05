@@ -16,7 +16,8 @@ import {
   Award,
   FileText,
   X,
-  Phone
+  Phone,
+  ShieldCheck
 } from 'lucide-react';
 
 interface CartDrawerProps {
@@ -221,13 +222,21 @@ export default function CartDrawer({
                 )}
               </div>
 
-              {/* Title & Unit Price */}
+              {/* Title & Unit Price & Warranty */}
               <div className="flex-1 min-w-0">
                 <h4 className="text-xs font-semibold text-stone-900 truncate">
                   {item.product.name}
                 </h4>
-                <div className="text-[11px] text-stone-500 font-mono">
-                  {formatMoney(item.product.sellingPrice)} each
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] text-stone-500 font-mono">
+                    {formatMoney(item.product.sellingPrice)} each
+                  </span>
+                  {item.product.warranty && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[9px] font-semibold border border-emerald-200/60">
+                      <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+                      <span>{item.product.warranty} Warranty</span>
+                    </span>
+                  )}
                 </div>
               </div>
 

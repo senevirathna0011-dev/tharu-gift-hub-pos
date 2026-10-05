@@ -47,6 +47,7 @@ export async function PUT(
       imageUrl,
       images,
       description,
+      warranty,
       isPublic,
       supplierId,
     } = body;
@@ -98,6 +99,7 @@ export async function PUT(
         ...(finalImage !== undefined && { image: finalImage }),
         ...(finalImages !== undefined && { images: finalImages }),
         ...(description !== undefined && { description: description?.trim() || null }),
+        ...(warranty !== undefined && { warranty: warranty?.trim() || null }),
         ...(isPublic !== undefined && { isPublic: Boolean(isPublic) }),
         ...(supplierId !== undefined && { supplierId: supplierId?.trim() || null }),
       },

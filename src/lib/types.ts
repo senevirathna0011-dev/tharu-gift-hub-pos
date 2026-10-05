@@ -60,6 +60,7 @@ export interface Product {
   imageUrl?: string | null;
   images?: string[];
   description?: string | null;
+  warranty?: string | null;
   isPublic?: boolean;
   supplierId?: string | null;
   supplier?: Supplier | null;
@@ -76,6 +77,7 @@ export interface CatalogProduct {
   image?: string | null;
   images?: string[];
   description?: string | null;
+  warranty?: string | null;
   inStock: boolean;
 }
 
@@ -116,6 +118,7 @@ export interface SaleItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  warranty?: string | null;
 }
 
 export interface SalesReturnItem {
@@ -200,6 +203,7 @@ export interface QuotationItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  warranty?: string | null;
 }
 
 export interface Quotation {

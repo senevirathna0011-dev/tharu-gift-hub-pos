@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Sale, StoreSettings } from '@/lib/types';
-import { formatDate, formatCurrency } from '@/lib/formatters';
+import { formatDate, formatCurrency, formatItemNameWithWarranty } from '@/lib/formatters';
 import { generateInvoicePDF, createInvoicePDFBlob } from '@/lib/pdfInvoice';
 import { generateWhatsAppInvoiceText, getWhatsAppShareUrl } from '@/lib/whatsapp';
 import { 
@@ -338,7 +338,7 @@ export default function PublicInvoicePage() {
                       {idx + 1}
                     </td>
                     <td className="py-3.5 px-3 font-bold text-stone-900">
-                      {item.productName}
+                      {formatItemNameWithWarranty(item.productName, item.warranty)}
                     </td>
                     <td className="py-3.5 px-3 font-mono text-stone-500 text-[11px]">
                       {item.productSku}

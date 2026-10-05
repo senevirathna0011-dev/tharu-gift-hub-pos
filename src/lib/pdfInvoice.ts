@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Sale, StoreSettings } from '@/lib/types';
-import { formatDate, formatCurrency } from '@/lib/formatters';
+import { formatDate, formatCurrency, formatItemNameWithWarranty } from '@/lib/formatters';
 
 export function buildInvoicePDFDoc(sale: Sale, settings: StoreSettings): jsPDF {
   const doc = new jsPDF({
@@ -126,7 +126,7 @@ export function buildInvoicePDFDoc(sale: Sale, settings: StoreSettings): jsPDF {
   // --- ITEMS TABLE ---
   const tableData = sale.items.map((item, index) => [
     index + 1,
-    item.productName,
+    formatItemNameWithWarranty(item.productName, item.warranty),
     item.productSku,
     item.quantity,
     formatCurrency(item.unitPrice, currency),

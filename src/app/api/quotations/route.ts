@@ -54,9 +54,14 @@ export async function POST(request: NextRequest) {
       const itemSubtotal = +(item.unitPrice * item.quantity).toFixed(2);
       subtotal += itemSubtotal;
 
+      const cleanWarranty = (item as any).warranty;
+      const displayName = cleanWarranty && !item.productName.toLowerCase().includes('warranty')
+        ? `${item.productName} (${cleanWarranty.trim()} Warranty)`
+        : item.productName;
+
       return {
         productId: item.productId || null,
-        productName: item.productName,
+        productName: displayName,
         productSku: item.productSku,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),

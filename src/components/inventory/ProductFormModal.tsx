@@ -21,7 +21,8 @@ import {
   Plus,
   ArrowLeft,
   ArrowRight,
-  Star
+  Star,
+  ShieldCheck
 } from 'lucide-react';
 
 interface ProductFormModalProps {
@@ -44,6 +45,15 @@ const CATEGORY_OPTIONS = [
   'Stationery & Journals',
 ];
 
+const WARRANTY_PRESETS = [
+  'No Warranty',
+  '1 Month',
+  '3 Months',
+  '6 Months',
+  '1 Year',
+  '2 Years',
+];
+
 const MAX_PHOTOS = 5;
 
 export default function ProductFormModal({
@@ -60,6 +70,7 @@ export default function ProductFormModal({
   const [sellingPrice, setSellingPrice] = useState<number | string>('');
   const [stockQuantity, setStockQuantity] = useState<number | string>(10);
   const [minStockAlert, setMinStockAlert] = useState<number | string>(5);
+  const [warranty, setWarranty] = useState<string>('');
   const [supplierId, setSupplierId] = useState<string>('');
   const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
   
@@ -114,6 +125,7 @@ export default function ProductFormModal({
         setSellingPrice(initialProduct.sellingPrice);
         setStockQuantity(initialProduct.stockQuantity);
         setMinStockAlert(initialProduct.minStockAlert);
+        setWarranty(initialProduct.warranty || '');
         setSupplierId(initialProduct.supplierId || initialProduct.supplier?.id || '');
         
         // Initialize images array from images or single image fallback
@@ -138,6 +150,7 @@ export default function ProductFormModal({
         setSellingPrice('');
         setStockQuantity(10);
         setMinStockAlert(5);
+        setWarranty('');
         setSupplierId('');
         setImages([]);
         setUrlInput('');
@@ -340,6 +353,7 @@ export default function ProductFormModal({
       sellingPrice: Number(sellingPrice) || 0,
       stockQuantity: parseInt(String(stockQuantity), 10) || 0,
       minStockAlert: parseInt(String(minStockAlert), 10) || 5,
+      warranty: warranty.trim() || null,
       image: primaryImg,
       imageUrl: primaryImg,
       images: images,
@@ -369,7 +383,7 @@ export default function ProductFormModal({
                 {isEdit ? 'Edit Gift Item' : 'Add New Gift Product'}
               </h3>
               <p className="text-xs text-stone-500">
-                {isEdit ? 'Update product pricing, images (up to 5), supplier, and stock levels' : 'Enter product details and photos to add to POS register'}
+                {isEdit ? 'Update product pricing, images (up to 5), warranty, supplier, and stock levels' : 'Enter product details and photos to add to POS register'}
               </p>
             </div>
           </div>
@@ -583,6 +597,68 @@ export default function ProductFormModal({
               />
               <p className="text-[11px] text-stone-400 mt-0.5">Trigger warning when stock drops to</p>
             </div>
+          </div>
+
+          {/* Warranty Period Field */}
+          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Warranty Period</span>
+                <span className="text-stone-400 font-normal">(Optional)</span>
+              </label>
+              {warranty && (
+                <button
+                  type="button"
+                  onClick={() => setWarranty('')}
+                  className="text-[11px] text-stone-400 hover:text-rose-600"
+                >
+                  Clear Warranty
+                </button>
+              )}
+            </div>
+
+            {/* Quick Preset Pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {WARRANTY_PRESETS.map((preset) => {
+                const isSelected = preset === 'No Warranty' ? !warranty : warranty === preset;
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => {
+                      if (preset === 'No Warranty') {
+                        setWarranty('');
+                      } else {
+                        setWarranty(preset);
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'bg-white text-stone-600 hover:bg-stone-200/80 border border-stone-200/80'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom Input */}
+            <div className="relative pt-1">
+              <ShieldCheck className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
+              <input
+                type="text"
+                value={warranty}
+                onChange={(e) => setWarranty(e.target.value)}
+                placeholder="e.g. 6 Months, 1 Year, 2 Years Replacement..."
+                className="w-full pl-9 pr-3.5 py-2 bg-white rounded-xl border border-stone-200 text-xs font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+            <p className="text-[11px] text-stone-400">
+              When provided, receipts, PDF invoices, quotations, and catalog orders will display: <strong className="text-stone-600 font-semibold">{name ? `${name} (${warranty || '6 Months'} Warranty)` : `Item Name (${warranty || '6 Months'} Warranty)`}</strong>
+            </p>
           </div>
 
           {/* MULTI-PRODUCT IMAGE SECTION (UP TO 5 PHOTOS) */}

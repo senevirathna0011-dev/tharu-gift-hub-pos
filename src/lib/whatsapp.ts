@@ -1,5 +1,5 @@
-import { Sale, StoreSettings } from '@/lib/types';
-import { formatDate, formatCurrency } from '@/lib/formatters';
+import { Sale, Quotation, StoreSettings } from '@/lib/types';
+import { formatDate, formatCurrency, formatItemNameWithWarranty } from '@/lib/formatters';
 
 /**
  * Formats a clean, itemized invoice message for WhatsApp sharing with optional online PDF link.
@@ -17,8 +17,9 @@ export function generateWhatsAppInvoiceText(
 
   const itemsLines = sale.items
     .map((item, index) => {
+      const displayName = formatItemNameWithWarranty(item.productName, item.warranty);
       const subtotalFormatted = formatCurrency(item.subtotal, currencySymbol);
-      return `${index + 1}. ${item.productName} x ${item.quantity} = ${subtotalFormatted}`;
+      return `${index + 1}. ${displayName} x ${item.quantity} = ${subtotalFormatted}`;
     })
     .join('\n');
 
@@ -44,6 +45,47 @@ Thank you for shopping with ${shopName}!`;
 }
 
 /**
+ * Formats a clean quotation message for WhatsApp sharing.
+ */
+export function generateWhatsAppQuotationText(
+  quotation: Quotation,
+  settings: StoreSettings
+): string {
+  const shopName = settings.shopName || 'Tharu Gift Hub';
+  const currencySymbol = settings.currencySymbol || 'LKR';
+  const quotationNo = quotation.quotationNo;
+  const customerName = quotation.customerName || 'Valued Customer';
+  const formattedDate = formatDate(quotation.createdAt);
+  const formattedValidUntil = formatDate(quotation.validUntil);
+
+  const itemsLines = quotation.items
+    .map((item, index) => {
+      const displayName = formatItemNameWithWarranty(item.productName, item.warranty);
+      const subtotalFormatted = formatCurrency(item.subtotal, currencySymbol);
+      return `${index + 1}. ${displayName} (SKU: ${item.productSku}) x ${item.quantity} = ${subtotalFormatted}`;
+    })
+    .join('\n');
+
+  const grandTotalFormatted = formatCurrency(quotation.totalAmount, currencySymbol);
+
+  return `📋 *${shopName} - Quotation / Proforma Invoice*
+----------------------------------
+Quotation No: #${quotationNo}
+Customer: ${customerName}
+Date Issued: ${formattedDate}
+Valid Until: ${formattedValidUntil}
+
+*Itemized Estimate:*
+${itemsLines}
+
+----------------------------------
+💰 *Grand Total: ${grandTotalFormatted}*
+
+*Note:* This quotation is valid for 14 days. Prices subject to inventory availability.
+Thank you for choosing ${shopName}!`;
+}
+
+/**
  * Cleans phone number and formats it for WhatsApp URL.
  * Automatically handles standard Sri Lankan mobile prefixes (07X -> 947X) if applicable.
  */
@@ -64,13 +106,15 @@ export function cleanPhoneNumberForWhatsApp(phone: string): string {
 }
 
 /**
- * Builds direct WhatsApp URL.
+ * Builds direct WhatsApp Web URL.
+ * Formats as https://web.whatsapp.com/send?phone=PHONE_NUMBER&text=ENCODED_TEXT
  */
 export function getWhatsAppShareUrl(phone: string, text: string): string {
   const cleaned = cleanPhoneNumberForWhatsApp(phone);
   const encodedText = encodeURIComponent(text);
   if (cleaned) {
-    return `https://wa.me/${cleaned}?text=${encodedText}`;
+    return `https://web.whatsapp.com/send?phone=${cleaned}&text=${encodedText}`;
   }
-  return `https://api.whatsapp.com/send?text=${encodedText}`;
+  return `https://web.whatsapp.com/send?text=${encodedText}`;
 }
+

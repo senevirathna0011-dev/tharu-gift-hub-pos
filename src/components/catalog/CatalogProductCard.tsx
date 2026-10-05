@@ -13,7 +13,8 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Images,
-  Eye
+  Eye,
+  ShieldCheck
 } from 'lucide-react';
 
 interface CatalogProductCardProps {
@@ -193,13 +194,21 @@ export default function CatalogProductCard({
             {product.name}
           </h3>
 
-          {/* Barcode if available */}
-          {product.sku && (
-            <div className="mt-1 flex items-center gap-1 text-[10px] text-stone-400 font-mono">
-              <Barcode className="w-3 h-3 text-stone-400" />
-              <span>{product.sku}</span>
-            </div>
-          )}
+          {/* Barcode & Warranty if available */}
+          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+            {product.sku && (
+              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-mono">
+                <Barcode className="w-3 h-3 text-stone-400" />
+                <span>{product.sku}</span>
+              </div>
+            )}
+            {product.warranty && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[9px] font-semibold border border-emerald-200/60">
+                <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+                <span>{product.warranty} Warranty</span>
+              </span>
+            )}
+          </div>
 
           {/* Description / Gift Notes */}
           {product.description && (
