@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation';
 import { Sale, StoreSettings } from '@/lib/types';
 import { formatDate, formatCurrency, formatItemNameWithWarranty } from '@/lib/formatters';
 import { generateInvoicePDF, createInvoicePDFBlob } from '@/lib/pdfInvoice';
-import { generateWhatsAppInvoiceText, getWhatsAppShareUrl } from '@/lib/whatsapp';
+import { generateWhatsAppInvoiceText, sharePdfDocumentViaWhatsApp } from '@/lib/whatsapp';
+import { useToast } from '@/components/ui/Toast';
 import { 
   CheckCircle2, 
   Printer, 
@@ -29,10 +30,12 @@ import {
 export default function PublicInvoicePage() {
   const params = useParams();
   const id = params?.id as string;
+  const { toast } = useToast();
 
   const [sale, setSale] = useState<Sale | null>(null);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSharingPdf, setIsSharingPdf] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchInvoice = useCallback(async () => {
@@ -75,9 +78,10 @@ export default function PublicInvoicePage() {
       receiptFooter: 'Thank you for shopping with us!',
     };
     generateInvoicePDF(sale, settings);
+    toast('PDF Invoice downloaded successfully!', 'success');
   };
 
-  const handleShareWhatsApp = () => {
+  const handleShareWhatsApp = async () => {
     if (!sale) return;
     const settings = storeSettings || {
       shopName: 'Tharu Gift Hub',
@@ -89,12 +93,32 @@ export default function PublicInvoicePage() {
       receiptFooter: 'Thank you for shopping with us!',
     };
 
-    const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
-    const invoiceText = generateWhatsAppInvoiceText(sale, settings, currentUrl);
+    const invoiceText = generateWhatsAppInvoiceText(sale, settings);
     const phone = sale.customerPhone || sale.customer?.phone || '';
+    const fileName = `Tharu_Gift_Hub_Invoice_${sale.receiptNo}.pdf`;
 
-    const waUrl = getWhatsAppShareUrl(phone, invoiceText);
-    window.open(waUrl, '_blank', 'noopener,noreferrer');
+    try {
+      setIsSharingPdf(true);
+      const pdfBlob = createInvoicePDFBlob(sale, settings);
+      await sharePdfDocumentViaWhatsApp({
+        phone,
+        text: invoiceText,
+        pdfBlob,
+        fileName,
+        dialogTitle: `Invoice #${sale.receiptNo}`,
+        onDesktopFallback: () => {
+          toast('PDF Invoice downloaded! You can attach it to the WhatsApp chat.', 'success');
+        },
+        onMobileShared: () => {
+          toast('Sharing PDF invoice...', 'info');
+        },
+      });
+    } catch (err: any) {
+      console.error('Failed to share invoice via WhatsApp:', err);
+      toast('Failed to share PDF invoice', 'error');
+    } finally {
+      setIsSharingPdf(false);
+    }
   };
 
   if (isLoading) {
@@ -160,16 +184,21 @@ export default function PublicInvoicePage() {
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={handleShareWhatsApp}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all font-display"
-              title="Share invoice on WhatsApp"
+              disabled={isSharingPdf}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all font-display cursor-pointer disabled:opacity-60"
+              title="Share PDF invoice via WhatsApp"
             >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Share</span>
+              {isSharingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Share2 className="w-3.5 h-3.5" />
+              )}
+              <span>Share via WhatsApp</span>
             </button>
 
             <button
               onClick={handleDownloadPDF}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-[0.99] text-white text-xs font-bold shadow-md shadow-purple-600/20 transition-all font-display"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-[0.99] text-white text-xs font-bold shadow-md shadow-purple-600/20 transition-all font-display cursor-pointer"
               title="Download official PDF invoice"
             >
               <FileDown className="w-3.5 h-3.5" />
@@ -178,7 +207,7 @@ export default function PublicInvoicePage() {
 
             <button
               onClick={handlePrint}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-all font-display"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-all font-display cursor-pointer"
               title="Print invoice"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -388,7 +417,7 @@ export default function PublicInvoicePage() {
                 {sale.changeDue > 0 && (
                   <div className="flex justify-between text-emerald-700 font-bold">
                     <span>Change Returned:</span>
-                    <span className="font-mono">{formatCurrency(sale.changeDue, currency)}</span>
+                    <span className="font-mono">{formatCurrency(sale.changeDue)}</span>
                   </div>
                 )}
               </div>

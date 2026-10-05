@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Quotation } from '@/lib/types';
 import { formatDate, formatCurrency, formatItemNameWithWarranty } from '@/lib/formatters';
-import { generateWhatsAppQuotationText, getWhatsAppShareUrl } from '@/lib/whatsapp';
+import { generateWhatsAppQuotationText, sharePdfDocumentViaWhatsApp } from '@/lib/whatsapp';
+import { generateQuotationPDF, createQuotationPDFBlob } from '@/lib/pdfQuotation';
 import { useSettings } from '@/context/SettingsContext';
+import { useToast } from '@/components/ui/Toast';
 import { 
   X, 
   Printer, 
@@ -13,11 +15,10 @@ import {
   Phone, 
   Mail, 
   MapPin, 
-  Calendar, 
-  Clock, 
   ShieldAlert,
-  Download,
-  Share2
+  FileDown,
+  Share2,
+  Loader2
 } from 'lucide-react';
 
 interface QuotationModalProps {
@@ -32,6 +33,10 @@ export default function QuotationModal({
   quotation,
 }: QuotationModalProps) {
   const { settings, formatMoney } = useSettings();
+  const { toast } = useToast();
+
+  const [isSharingPdf, setIsSharingPdf] = useState<boolean>(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
 
   const handlePrint = useCallback(() => {
     requestAnimationFrame(() => {
@@ -41,13 +46,49 @@ export default function QuotationModal({
     });
   }, []);
 
-  const handleShareWhatsApp = useCallback(() => {
+  const handleDownloadPDF = useCallback(() => {
+    if (!quotation) return;
+    try {
+      setIsDownloadingPdf(true);
+      generateQuotationPDF(quotation, settings);
+      toast('PDF Quotation downloaded successfully!', 'success');
+    } catch (err) {
+      console.error('Failed to generate PDF quotation:', err);
+      toast('Failed to generate PDF quotation', 'error');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  }, [quotation, settings, toast]);
+
+  const handleShareWhatsApp = useCallback(async () => {
     if (!quotation) return;
     const phone = quotation.customerPhone || quotation.customer?.phone || '';
     const text = generateWhatsAppQuotationText(quotation, settings);
-    const url = getWhatsAppShareUrl(phone, text);
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }, [quotation, settings]);
+    const fileName = `Quotation_${quotation.quotationNo}.pdf`;
+
+    try {
+      setIsSharingPdf(true);
+      const pdfBlob = createQuotationPDFBlob(quotation, settings);
+      await sharePdfDocumentViaWhatsApp({
+        phone,
+        text,
+        pdfBlob,
+        fileName,
+        dialogTitle: `Quotation #${quotation.quotationNo}`,
+        onDesktopFallback: () => {
+          toast('PDF Quotation downloaded! You can attach it to the WhatsApp chat.', 'success');
+        },
+        onMobileShared: () => {
+          toast('Sharing PDF quotation...', 'info');
+        },
+      });
+    } catch (err: any) {
+      console.error('WhatsApp quotation share error:', err);
+      toast('Failed to share PDF quotation', 'error');
+    } finally {
+      setIsSharingPdf(false);
+    }
+  }, [quotation, settings, toast]);
 
   if (!isOpen || !quotation) return null;
 
@@ -70,7 +111,7 @@ export default function QuotationModal({
                 Proforma Invoice / Quotation
               </h3>
               <p className="text-[11px] text-stone-500 font-mono">
-                Standard A4 Document Preview
+                Official Document Preview &bull; #{quotation.quotationNo}
               </p>
             </div>
           </div>
@@ -78,22 +119,36 @@ export default function QuotationModal({
           <div className="flex items-center gap-2">
             <button
               onClick={handleShareWhatsApp}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all font-display cursor-pointer"
-              title="Share quotation estimate via WhatsApp"
+              disabled={isSharingPdf}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all font-display cursor-pointer disabled:opacity-60"
+              title="Share PDF quotation via WhatsApp"
             >
-              <Share2 className="w-4 h-4" />
+              {isSharingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Share2 className="w-3.5 h-3.5" />
+              )}
               <span>Share via WhatsApp</span>
             </button>
             <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-rose-600/25 transition-all font-display"
+              onClick={handleDownloadPDF}
+              disabled={isDownloadingPdf}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 active:scale-[0.99] text-stone-800 font-bold text-xs shadow-2xs transition-all font-display cursor-pointer disabled:opacity-60"
+              title="Download official PDF quotation"
             >
-              <Printer className="w-4 h-4" />
-              <span>Print A4 Invoice</span>
+              <FileDown className="w-3.5 h-3.5 text-purple-600" />
+              <span>Download PDF</span>
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-rose-600/25 transition-all font-display cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print A4</span>
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 transition-colors"
+              className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -144,7 +199,7 @@ export default function QuotationModal({
                   PROFORMA INVOICE
                 </div>
                 <div className="text-base font-black font-mono text-stone-900">
-                  {quotation.quotationNo}
+                  #{quotation.quotationNo}
                 </div>
                 <div className="text-xs text-stone-600 space-y-0.5 pt-1">
                   <div className="flex justify-between sm:justify-end gap-3">

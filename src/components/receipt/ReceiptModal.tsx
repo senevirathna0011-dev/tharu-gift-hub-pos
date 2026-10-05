@@ -7,8 +7,7 @@ import { useSettings } from '@/context/SettingsContext';
 import { generateInvoicePDF, createInvoicePDFBlob } from '@/lib/pdfInvoice';
 import { 
   generateWhatsAppInvoiceText, 
-  getWhatsAppShareUrl, 
-  cleanPhoneNumberForWhatsApp 
+  sharePdfDocumentViaWhatsApp 
 } from '@/lib/whatsapp';
 import { 
   Printer, 
@@ -16,15 +15,14 @@ import {
   X, 
   PlusCircle, 
   Share2, 
-  Download, 
   MessageSquare, 
   Phone, 
   Copy, 
   Check, 
   ExternalLink,
-  Sparkles,
   FileDown,
-  Globe
+  Globe,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -64,24 +62,39 @@ export default function ReceiptModal({
     });
   }, []);
 
-  const handleShareWhatsApp = useCallback(() => {
+  const handleShareWhatsApp = useCallback(async () => {
     if (!sale) return;
     const phoneToUse = customPhone.trim() || sale.customerPhone || sale.customer?.phone || '';
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const invoiceUrl = origin ? `${origin}/invoice/${sale.id}` : '';
-    const invoiceText = generateWhatsAppInvoiceText(sale, settings, invoiceUrl);
+    const invoiceText = generateWhatsAppInvoiceText(sale, settings);
+    const fileName = `Tharu_Gift_Hub_Invoice_${sale.receiptNo}.pdf`;
 
-    // Direct WhatsApp Web link
-    const url = getWhatsAppShareUrl(phoneToUse, invoiceText);
-    window.open(url, '_blank', 'noopener,noreferrer');
-    toast('Opening WhatsApp Web with itemized invoice & link...', 'info');
+    try {
+      setIsSharingPdf(true);
+      const pdfBlob = createInvoicePDFBlob(sale, settings);
+      await sharePdfDocumentViaWhatsApp({
+        phone: phoneToUse,
+        text: invoiceText,
+        pdfBlob,
+        fileName,
+        dialogTitle: `Invoice #${sale.receiptNo}`,
+        onDesktopFallback: () => {
+          toast('PDF Invoice downloaded! You can attach it to the WhatsApp chat.', 'success');
+        },
+        onMobileShared: () => {
+          toast('Sharing PDF invoice...', 'info');
+        },
+      });
+    } catch (err: any) {
+      console.error('WhatsApp share error:', err);
+      toast('Failed to share PDF invoice', 'error');
+    } finally {
+      setIsSharingPdf(false);
+    }
   }, [sale, customPhone, settings, toast]);
 
   const handleCopyWhatsAppText = useCallback(() => {
     if (!sale) return;
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const invoiceUrl = origin ? `${origin}/invoice/${sale.id}` : '';
-    const invoiceText = generateWhatsAppInvoiceText(sale, settings, invoiceUrl);
+    const invoiceText = generateWhatsAppInvoiceText(sale, settings);
     navigator.clipboard.writeText(invoiceText);
     setCopied(true);
     toast('Invoice text copied to clipboard!', 'success');
@@ -150,10 +163,10 @@ export default function ReceiptModal({
                   <div className="w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center shadow-xs">
                     <MessageSquare className="w-3.5 h-3.5" />
                   </div>
-                  <span>WhatsApp Invoice</span>
+                  <span>WhatsApp PDF Invoice</span>
                 </div>
                 <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                  PDF & Text
+                  Direct PDF Share
                 </span>
               </div>
 
@@ -189,18 +202,21 @@ export default function ReceiptModal({
                   type="button"
                   onClick={handleShareWhatsApp}
                   disabled={isSharingPdf}
-                  className="flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all font-display disabled:opacity-60"
-                  title="Share invoice with PDF and web link via WhatsApp"
+                  className="flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all font-display disabled:opacity-60 cursor-pointer"
+                  title="Share actual PDF invoice directly to WhatsApp"
                 >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>Share via WhatsApp</span>
-                  <ExternalLink className="w-3 h-3 opacity-70" />
+                  {isSharingPdf ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Share2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>Share PDF via WhatsApp</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleCopyWhatsAppText}
-                  className="px-2.5 py-2.5 rounded-xl border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1"
+                  className="px-2.5 py-2.5 rounded-xl border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
                   title="Copy formatted invoice text to clipboard"
                 >
                   {copied ? (
@@ -228,7 +244,7 @@ export default function ReceiptModal({
               <button
                 type="button"
                 onClick={handlePrint}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-rose-600/25 transition-all font-display"
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-rose-600/25 transition-all font-display cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center">
@@ -251,7 +267,7 @@ export default function ReceiptModal({
                 type="button"
                 onClick={handleDownloadPDF}
                 disabled={isDownloadingPdf}
-                className="w-full flex items-center justify-between p-3 rounded-2xl border border-stone-300 bg-white hover:bg-stone-50 active:scale-[0.99] text-stone-800 font-bold text-xs shadow-2xs transition-all font-display"
+                className="w-full flex items-center justify-between p-3 rounded-2xl border border-stone-300 bg-white hover:bg-stone-50 active:scale-[0.99] text-stone-800 font-bold text-xs shadow-2xs transition-all font-display cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
@@ -319,7 +335,7 @@ export default function ReceiptModal({
               <button
                 type="button"
                 onClick={onNewSale}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-rose-300 hover:border-rose-400 bg-rose-50/50 hover:bg-rose-50 text-rose-700 font-bold text-xs transition-all font-display"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-rose-300 hover:border-rose-400 bg-rose-50/50 hover:bg-rose-50 text-rose-700 font-bold text-xs transition-all font-display cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4" />
                 <span>Ready for Next Customer (New Sale)</span>
@@ -344,10 +360,11 @@ export default function ReceiptModal({
           </button>
           <button
             onClick={handleShareWhatsApp}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs font-display"
+            disabled={isSharingPdf}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs font-display disabled:opacity-60"
           >
             <Share2 className="w-3.5 h-3.5" />
-            <span>WhatsApp</span>
+            <span>WhatsApp PDF</span>
           </button>
           {onNewSale && (
             <button
