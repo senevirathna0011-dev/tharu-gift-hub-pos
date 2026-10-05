@@ -18,7 +18,8 @@ import {
   RefreshCw, 
   Gift, 
   User,
-  RotateCcw
+  RotateCcw,
+  Phone
 } from 'lucide-react';
 
 export default function SalesPage() {
@@ -223,8 +224,16 @@ export default function SalesPage() {
                       </td>
 
                       {/* Customer */}
-                      <td className="py-3.5 px-4 font-medium text-stone-800">
-                        {sale.customerName || 'Walk-in Customer'}
+                      <td className="py-3.5 px-4">
+                        <div className="font-medium text-stone-800">
+                          {sale.customerName || 'Walk-in Customer'}
+                        </div>
+                        {(sale.customerPhone || sale.customer?.phone) && (
+                          <div className="text-[10px] text-stone-500 font-mono flex items-center gap-1 mt-0.5">
+                            <Phone className="w-2.5 h-2.5 text-stone-400" />
+                            <span>{sale.customerPhone || sale.customer?.phone}</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Cashier */}

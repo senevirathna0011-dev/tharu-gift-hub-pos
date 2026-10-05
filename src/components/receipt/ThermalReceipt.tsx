@@ -67,6 +67,14 @@ export default function ThermalReceipt({
             {sale.customerName || 'Walk-in Customer'}
           </span>
         </div>
+        {(sale.customerPhone || sale.customer?.phone) && (
+          <div className="flex justify-between items-center">
+            <span>Customer Tel:</span>
+            <span className="font-mono font-medium text-right">
+              {sale.customerPhone || sale.customer?.phone}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between items-center">
           <span>Cashier:</span>
           <span className="font-semibold">{cashier}</span>

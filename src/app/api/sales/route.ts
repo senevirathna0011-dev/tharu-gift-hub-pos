@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
       whereClause.OR = [
         { receiptNo: { contains: search } },
         { customerName: { contains: search } },
+        { customerPhone: { contains: search } },
       ];
     }
 

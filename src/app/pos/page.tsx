@@ -32,6 +32,7 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerName, setCustomerName] = useState<string>('');
+  const [customerPhone, setCustomerPhone] = useState<string>('');
   const [discountType, setDiscountType] = useState<DiscountType>('NONE');
   const [discountValue, setDiscountValue] = useState<number>(0);
   
@@ -156,6 +157,7 @@ export default function POSPage() {
     setTaxRate(0); // Reset tax back to OFF by default
     setSelectedCustomer(null);
     setCustomerName('');
+    setCustomerPhone('');
   };
 
   // Barcode enter scan
@@ -203,10 +205,15 @@ export default function POSPage() {
   const handleCompleteSale = async (
     paymentMethod: PaymentMethod,
     amountPaid: number,
-    notes?: string
+    notes?: string,
+    checkoutPhone?: string
   ) => {
     try {
       setIsProcessingSale(true);
+      const finalCustomerPhone = checkoutPhone !== undefined 
+        ? checkoutPhone 
+        : (selectedCustomer ? selectedCustomer.phone : customerPhone);
+
       const payload = {
         items: cart.map((item) => ({
           productId: item.product.id,
@@ -215,6 +222,7 @@ export default function POSPage() {
         })),
         customerId: selectedCustomer?.id || undefined,
         customerName: selectedCustomer ? selectedCustomer.name : (customerName.trim() || 'Walk-in Customer'),
+        customerPhone: finalCustomerPhone?.trim() || undefined,
         cashierId: currentUser?.id || null,
         cashierName: currentUser?.name || 'Cashier',
         discountType,
@@ -277,7 +285,7 @@ export default function POSPage() {
         })),
         customerId: selectedCustomer?.id,
         customerName: selectedCustomer ? selectedCustomer.name : (customerName.trim() || 'Valued Customer'),
-        customerPhone: selectedCustomer?.phone || '',
+        customerPhone: selectedCustomer?.phone || customerPhone || '',
         customerEmail: selectedCustomer?.email || '',
         customerAddress: selectedCustomer?.address || '',
         discountType,
@@ -316,6 +324,8 @@ export default function POSPage() {
       if (resData.success && resData.customer) {
         toast(`Customer "${resData.customer.name}" registered!`, 'success');
         setSelectedCustomer(resData.customer);
+        setCustomerName(resData.customer.name);
+        setCustomerPhone(resData.customer.phone || '');
         return true;
       } else {
         toast(resData.error || 'Failed to register customer', 'error');
@@ -389,10 +399,13 @@ export default function POSPage() {
             onClearCart={handleClearCart}
             selectedCustomer={selectedCustomer}
             customerName={customerName}
+            customerPhone={customerPhone}
+            onCustomerPhoneChange={setCustomerPhone}
             onOpenCustomerSelect={() => setIsCustomerSelectOpen(true)}
             onClearCustomer={() => {
               setSelectedCustomer(null);
               setCustomerName('');
+              setCustomerPhone('');
             }}
             discountType={discountType}
             discountValue={discountValue}
@@ -413,6 +426,8 @@ export default function POSPage() {
         isOpen={isPaymentOpen}
         onClose={() => setIsPaymentOpen(false)}
         totalAmount={grandTotal}
+        customerName={selectedCustomer ? selectedCustomer.name : (customerName || 'Walk-in Customer')}
+        initialCustomerPhone={selectedCustomer ? selectedCustomer.phone : customerPhone}
         onCompleteSale={handleCompleteSale}
         isProcessing={isProcessingSale}
       />
@@ -441,8 +456,13 @@ export default function POSPage() {
         onClose={() => setIsCustomerSelectOpen(false)}
         onSelectCustomer={(c) => {
           setSelectedCustomer(c);
-          if (c) setCustomerName(c.name);
-          else setCustomerName('');
+          if (c) {
+            setCustomerName(c.name);
+            setCustomerPhone(c.phone || '');
+          } else {
+            setCustomerName('');
+            setCustomerPhone('');
+          }
         }}
         selectedCustomerId={selectedCustomer?.id}
         onOpenNewCustomerModal={() => setIsNewCustomerOpen(true)}

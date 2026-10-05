@@ -15,7 +15,8 @@ import {
   Sparkles,
   Award,
   FileText,
-  X
+  X,
+  Phone
 } from 'lucide-react';
 
 interface CartDrawerProps {
@@ -25,6 +26,8 @@ interface CartDrawerProps {
   onClearCart: () => void;
   selectedCustomer: Customer | null;
   customerName: string;
+  customerPhone: string;
+  onCustomerPhoneChange: (phone: string) => void;
   onOpenCustomerSelect: () => void;
   onClearCustomer: () => void;
   discountType: DiscountType;
@@ -43,6 +46,8 @@ export default function CartDrawer({
   onClearCart,
   selectedCustomer,
   customerName,
+  customerPhone,
+  onCustomerPhoneChange,
   onOpenCustomerSelect,
   onClearCustomer,
   discountType,
@@ -95,12 +100,12 @@ export default function CartDrawer({
         )}
       </div>
 
-      {/* Customer Bar: Selectable or Quick-add */}
-      <div className="px-4 py-2 bg-stone-50 border-b border-stone-200 flex items-center justify-between gap-2 text-xs">
+      {/* Customer Bar: Selectable or Quick-add with Phone Number */}
+      <div className="px-3.5 py-2.5 bg-stone-50/90 border-b border-stone-200 text-xs space-y-2">
         {selectedCustomer ? (
-          <div className="flex items-center justify-between w-full bg-white p-2 rounded-xl border border-rose-200 shadow-2xs">
+          <div className="flex items-center justify-between w-full bg-white p-2.5 rounded-xl border border-rose-200 shadow-2xs">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-lg bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center shrink-0">
                 {selectedCustomer.name.charAt(0)}
               </div>
               <div className="min-w-0">
@@ -113,8 +118,9 @@ export default function CartDrawer({
                     </span>
                   )}
                 </div>
-                <div className="text-[10px] text-stone-500 font-mono truncate">
-                  {selectedCustomer.phone}
+                <div className="text-[10px] text-stone-500 font-mono truncate flex items-center gap-1 mt-0.5">
+                  <Phone className="w-2.5 h-2.5 text-stone-400" />
+                  <span>{selectedCustomer.phone}</span>
                 </div>
               </div>
             </div>
@@ -123,7 +129,7 @@ export default function CartDrawer({
               <button
                 type="button"
                 onClick={onOpenCustomerSelect}
-                className="text-[10px] text-rose-600 hover:underline font-semibold px-1"
+                className="text-[11px] text-rose-600 hover:underline font-bold px-1"
               >
                 Change
               </button>
@@ -138,22 +144,48 @@ export default function CartDrawer({
             </div>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={onOpenCustomerSelect}
-            className="w-full flex items-center justify-between p-2 rounded-xl bg-white hover:bg-rose-50/50 border border-stone-200 hover:border-rose-200 transition-all text-left group"
-          >
-            <div className="flex items-center gap-2 text-stone-600 group-hover:text-stone-900">
-              <User className="w-4 h-4 text-stone-400 group-hover:text-rose-600" />
-              <span className="font-medium text-xs">
-                {customerName ? customerName : 'Walk-in Customer (Tap to select / add)'}
-              </span>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-1.5">
+              <button
+                type="button"
+                onClick={onOpenCustomerSelect}
+                className="flex-1 flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white hover:bg-rose-50/50 border border-stone-200 hover:border-rose-200 transition-all text-left group"
+              >
+                <div className="flex items-center gap-1.5 text-stone-600 group-hover:text-stone-900 min-w-0">
+                  <User className="w-3.5 h-3.5 text-stone-400 group-hover:text-rose-600 shrink-0" />
+                  <span className="font-medium text-xs truncate">
+                    {customerName ? customerName : 'Walk-in Customer'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-rose-600 font-bold flex items-center gap-0.5 font-display shrink-0">
+                  <Plus className="w-2.5 h-2.5" />
+                  <span>Select / Add</span>
+                </span>
+              </button>
             </div>
-            <span className="text-[11px] text-rose-600 font-bold flex items-center gap-0.5 font-display">
-              <Plus className="w-3 h-3" />
-              <span>Customer</span>
-            </span>
-          </button>
+
+            {/* Optional Walk-in Customer Phone Number */}
+            <div className="relative flex items-center">
+              <Phone className="w-3 h-3 text-stone-400 absolute left-2.5 pointer-events-none" />
+              <input
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => onCustomerPhoneChange(e.target.value)}
+                placeholder="Customer Phone (WhatsApp Invoice)..."
+                className="w-full pl-7 pr-7 py-1.5 bg-white rounded-xl border border-stone-200 text-[11px] text-stone-800 placeholder:text-stone-400 focus:outline-hidden focus:border-rose-500 font-mono shadow-2xs transition-colors"
+              />
+              {customerPhone && (
+                <button
+                  type="button"
+                  onClick={() => onCustomerPhoneChange('')}
+                  className="absolute right-2 text-stone-400 hover:text-stone-600 p-0.5"
+                  title="Clear phone"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
         )}
       </div>
 

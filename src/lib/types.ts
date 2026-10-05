@@ -150,6 +150,7 @@ export interface Sale {
   customerId?: string | null;
   customer?: Customer | null;
   customerName?: string | null;
+  customerPhone?: string | null;
   cashierId?: string | null;
   cashierName?: string | null;
   subtotal: number;
@@ -176,6 +177,7 @@ export interface CheckoutPayload {
   }[];
   customerId?: string;
   customerName?: string;
+  customerPhone?: string;
   cashierId?: string;
   cashierName?: string;
   discountType: DiscountType;

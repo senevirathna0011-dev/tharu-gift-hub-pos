@@ -75,6 +75,7 @@ model Sale {
   customerId     String?
   customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerName   String?       @default("Walk-in Customer")
+  customerPhone  String?
   cashierId      String?
   cashierName    String?       @default("Cashier")
   subtotal       Float
