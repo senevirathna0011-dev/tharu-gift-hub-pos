@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     const changeDue = paymentMethod === 'CASH' ? Math.max(0, +(tendered - totalAmount).toFixed(2)) : 0.0;
 
-    // Step 3: Generate sequential unique receipt number
+    // Step 3: Generate sequential unique receipt number with configured store prefix
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
     const todayCount = await prisma.sale.count({
@@ -118,7 +118,10 @@ export async function POST(request: NextRequest) {
       },
     });
     const seqNum = String(todayCount + 1).padStart(4, '0');
-    const receiptNo = `BB-${dateStr}-${seqNum}`;
+    const storeSettings = await prisma.storeSettings.findFirst();
+    const rawPrefix = (storeSettings?.invoicePrefix || 'TGH-').trim();
+    const prefix = rawPrefix ? (rawPrefix.endsWith('-') ? rawPrefix : `${rawPrefix}-`) : 'TGH-';
+    const receiptNo = `${prefix}${dateStr}-${seqNum}`;
 
     // Step 4: Execute atomic database transaction
     const sale = await prisma.$transaction(async (tx) => {

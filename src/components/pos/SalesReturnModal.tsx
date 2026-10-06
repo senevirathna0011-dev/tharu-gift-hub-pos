@@ -63,7 +63,7 @@ export default function SalesReturnModal({
   onReturnProcessed,
 }: SalesReturnModalProps) {
   const { currentUser } = useAuth();
-  const { formatMoney } = useSettings();
+  const { settings, formatMoney } = useSettings();
   const { toast } = useToast();
 
   const [receiptQuery, setReceiptQuery] = useState('');
@@ -277,7 +277,7 @@ export default function SalesReturnModal({
                     value={receiptQuery}
                     onChange={(e) => setReceiptQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleLookupReceipt(receiptQuery)}
-                    placeholder="e.g. BB-20260819-0001"
+                    placeholder={`e.g. ${settings.invoicePrefix || 'TGH-'}20260819-0001`}
                     className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl border border-stone-200 text-xs font-mono font-bold focus:border-rose-500 focus:outline-hidden"
                   />
                 </div>

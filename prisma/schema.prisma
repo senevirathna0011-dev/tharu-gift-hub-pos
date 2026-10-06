@@ -199,22 +199,31 @@ model QuotationItem {
 }
 
 model StoreSettings {
-  id                String   @id @default("default")
-  shopName          String   @default("Tharu Gift Hub")
-  shopTagline       String?  @default("Curated Gifts, Keepsakes & Heartfelt Moments")
-  shopLogo          String?
-  address           String   @default("452 Velvet Lane, Suite 100, West District")
-  phone             String   @default("+1 (555) 839-4438")
-  email             String?  @default("hello@blissandbloomgifts.com")
-  currencySymbol    String   @default("$")
-  currencyCode      String   @default("USD")
-  taxRate           Float    @default(0.08)
-  headerNote        String?  @default("Welcome to Tharu Gift Hub")
-  footerNote        String?  @default("Thank you for shopping with us! Visit again. ✨")
-  receiptFooter     String   @default("Thank you for shopping with us! Visit again. ✨")
-  receiptNote       String?  @default("Items in original condition can be exchanged within 14 days with receipt.")
-  showLogoOnReceipt Boolean  @default(true)
-  updatedAt         DateTime @updatedAt
+  id                      String   @id @default("default")
+  shopName                String   @default("Tharu Gift Hub")
+  shopTagline             String?  @default("Curated Gifts, Keepsakes & Heartfelt Moments")
+  shopLogo                String?
+  address                 String   @default("452 Velvet Lane, Suite 100, West District")
+  phone                   String   @default("+1 (555) 839-4438")
+  email                   String?  @default("hello@blissandbloomgifts.com")
+  currencySymbol          String   @default("$")
+  currencyCode            String   @default("USD")
+  taxRate                 Float    @default(0.08)
+  headerNote              String?  @default("Welcome to Tharu Gift Hub")
+  footerNote              String?  @default("Thank you for shopping with us! Visit again. ✨")
+  receiptFooter           String   @default("Thank you for shopping with us! Visit again. ✨")
+  receiptNote             String?  @default("Items in original condition can be exchanged within 14 days with receipt.")
+  showLogoOnReceipt       Boolean  @default(true)
+  invoicePrefix           String   @default("TGH-")
+  invoicePrimaryColor     String   @default("#E11D48")
+  invoiceHeaderLayout     String   @default("split") // "split" | "centered"
+  showEmailOnInvoice      Boolean  @default(true)
+  showPhoneOnInvoice      Boolean  @default(true)
+  showTaglineOnInvoice    Boolean  @default(true)
+  showHeaderNoteOnInvoice Boolean  @default(true)
+  bankDetails             String?
+  invoiceTerms            String?
+  updatedAt               DateTime @updatedAt
 
   @@map("StoreSettings")
 }

@@ -28,6 +28,15 @@ export interface StoreSettings {
   receiptFooter: string;
   receiptNote?: string | null;
   showLogoOnReceipt?: boolean;
+  invoicePrefix?: string;
+  invoicePrimaryColor?: string;
+  invoiceHeaderLayout?: 'split' | 'centered';
+  showEmailOnInvoice?: boolean;
+  showPhoneOnInvoice?: boolean;
+  showTaglineOnInvoice?: boolean;
+  showHeaderNoteOnInvoice?: boolean;
+  bankDetails?: string | null;
+  invoiceTerms?: string | null;
   updatedAt?: string | Date;
 }
 

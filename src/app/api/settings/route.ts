@@ -27,6 +27,15 @@ export async function GET() {
           receiptFooter: 'Thank you for shopping with us! Visit again. ✨',
           receiptNote: 'Items in original condition can be exchanged within 14 days with receipt.',
           showLogoOnReceipt: true,
+          invoicePrefix: 'TGH-',
+          invoicePrimaryColor: '#E11D48',
+          invoiceHeaderLayout: 'split',
+          showEmailOnInvoice: true,
+          showPhoneOnInvoice: true,
+          showTaglineOnInvoice: true,
+          showHeaderNoteOnInvoice: true,
+          bankDetails: null,
+          invoiceTerms: null,
         },
       });
     }
@@ -59,6 +68,15 @@ export async function PUT(request: NextRequest) {
       receiptFooter,
       receiptNote,
       showLogoOnReceipt,
+      invoicePrefix,
+      invoicePrimaryColor,
+      invoiceHeaderLayout,
+      showEmailOnInvoice,
+      showPhoneOnInvoice,
+      showTaglineOnInvoice,
+      showHeaderNoteOnInvoice,
+      bankDetails,
+      invoiceTerms,
     } = body;
 
     const effectiveFooterNote = footerNote !== undefined ? footerNote : receiptFooter;
@@ -82,6 +100,15 @@ export async function PUT(request: NextRequest) {
         }),
         ...(receiptNote !== undefined && { receiptNote: receiptNote?.trim() || null }),
         ...(showLogoOnReceipt !== undefined && { showLogoOnReceipt: Boolean(showLogoOnReceipt) }),
+        ...(invoicePrefix !== undefined && { invoicePrefix: invoicePrefix?.trim() || 'TGH-' }),
+        ...(invoicePrimaryColor !== undefined && { invoicePrimaryColor: invoicePrimaryColor?.trim() || '#E11D48' }),
+        ...(invoiceHeaderLayout !== undefined && { invoiceHeaderLayout: invoiceHeaderLayout === 'centered' ? 'centered' : 'split' }),
+        ...(showEmailOnInvoice !== undefined && { showEmailOnInvoice: Boolean(showEmailOnInvoice) }),
+        ...(showPhoneOnInvoice !== undefined && { showPhoneOnInvoice: Boolean(showPhoneOnInvoice) }),
+        ...(showTaglineOnInvoice !== undefined && { showTaglineOnInvoice: Boolean(showTaglineOnInvoice) }),
+        ...(showHeaderNoteOnInvoice !== undefined && { showHeaderNoteOnInvoice: Boolean(showHeaderNoteOnInvoice) }),
+        ...(bankDetails !== undefined && { bankDetails: bankDetails?.trim() || null }),
+        ...(invoiceTerms !== undefined && { invoiceTerms: invoiceTerms?.trim() || null }),
       },
       create: {
         id: 'default',
@@ -99,6 +126,15 @@ export async function PUT(request: NextRequest) {
         receiptFooter: effectiveFooterNote?.trim() || 'Thank you for shopping with us! Visit again. ✨',
         receiptNote: receiptNote?.trim() || null,
         showLogoOnReceipt: showLogoOnReceipt !== undefined ? Boolean(showLogoOnReceipt) : true,
+        invoicePrefix: invoicePrefix?.trim() || 'TGH-',
+        invoicePrimaryColor: invoicePrimaryColor?.trim() || '#E11D48',
+        invoiceHeaderLayout: invoiceHeaderLayout === 'centered' ? 'centered' : 'split',
+        showEmailOnInvoice: showEmailOnInvoice !== undefined ? Boolean(showEmailOnInvoice) : true,
+        showPhoneOnInvoice: showPhoneOnInvoice !== undefined ? Boolean(showPhoneOnInvoice) : true,
+        showTaglineOnInvoice: showTaglineOnInvoice !== undefined ? Boolean(showTaglineOnInvoice) : true,
+        showHeaderNoteOnInvoice: showHeaderNoteOnInvoice !== undefined ? Boolean(showHeaderNoteOnInvoice) : true,
+        bankDetails: bankDetails?.trim() || null,
+        invoiceTerms: invoiceTerms?.trim() || null,
       },
     });
 

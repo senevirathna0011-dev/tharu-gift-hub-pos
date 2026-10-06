@@ -27,6 +27,15 @@ const defaultSettings: StoreSettings = {
   receiptFooter: 'Thank you for shopping with us! Visit again. ✨',
   receiptNote: 'Items in original condition can be exchanged within 14 days with receipt.',
   showLogoOnReceipt: true,
+  invoicePrefix: 'TGH-',
+  invoicePrimaryColor: '#E11D48',
+  invoiceHeaderLayout: 'split',
+  showEmailOnInvoice: true,
+  showPhoneOnInvoice: true,
+  showTaglineOnInvoice: true,
+  showHeaderNoteOnInvoice: true,
+  bankDetails: '',
+  invoiceTerms: '',
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

@@ -187,6 +187,13 @@ async function main() {
       taxRate: 0.08,
       receiptFooter: 'Thank you for shopping with us! Visit again. ✨',
       receiptNote: 'Items in original condition can be exchanged within 14 days with this receipt.',
+      invoicePrefix: 'TGH-',
+      invoicePrimaryColor: '#E11D48',
+      invoiceHeaderLayout: 'split',
+      showEmailOnInvoice: true,
+      showPhoneOnInvoice: true,
+      showTaglineOnInvoice: true,
+      showHeaderNoteOnInvoice: true,
     },
   });
 
@@ -223,7 +230,7 @@ async function main() {
 
       await prisma.sale.create({
         data: {
-          receiptNo: 'BB-20260815-0001',
+          receiptNo: 'TGH-20260815-0001',
           customerName: 'Sarah Jenkins',
           cashierId: 'default-admin',
           cashierName: 'Emma Harrison',

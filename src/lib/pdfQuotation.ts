@@ -3,6 +3,23 @@ import autoTable from 'jspdf-autotable';
 import { Quotation, StoreSettings } from '@/lib/types';
 import { formatDate, formatCurrency, formatItemNameWithWarranty } from '@/lib/formatters';
 
+function hexToRgb(hex: string | null | undefined, defaultRgb: [number, number, number] = [225, 29, 72]): [number, number, number] {
+  if (!hex) return defaultRgb;
+  const cleanHex = hex.replace('#', '').trim();
+  if (cleanHex.length === 3) {
+    const r = parseInt(cleanHex[0] + cleanHex[0], 16);
+    const g = parseInt(cleanHex[1] + cleanHex[1], 16);
+    const b = parseInt(cleanHex[2] + cleanHex[2], 16);
+    if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [r, g, b];
+  } else if (cleanHex.length === 6) {
+    const r = parseInt(cleanHex.substring(0, 2), 16);
+    const g = parseInt(cleanHex.substring(2, 4), 16);
+    const b = parseInt(cleanHex.substring(4, 6), 16);
+    if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [r, g, b];
+  }
+  return defaultRgb;
+}
+
 export function buildQuotationPDFDoc(quotation: Quotation, settings: StoreSettings): jsPDF {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -14,112 +31,227 @@ export function buildQuotationPDFDoc(quotation: Quotation, settings: StoreSettin
   const storeTagline = settings.shopTagline || 'Curated Gifts, Keepsakes & Heartfelt Moments';
   const storeAddress = settings.address || '452 Velvet Lane, West District';
   const storePhone = settings.phone || '+1 (555) 839-4438';
-  const storeEmail = settings.email || 'hello@blissandbloomgifts.com';
+  const storeEmail = settings.email || '';
   const storeLogo = settings.shopLogo;
+  const headerNote = settings.headerNote;
+  const bankDetails = settings.bankDetails;
   const currency = settings.currencySymbol || '$';
 
-  // --- BRAND HEADER BANNER ---
-  doc.setFillColor(225, 29, 72); // Rose-600
-  doc.rect(0, 0, 210, 8, 'F');
+  const showEmail = settings.showEmailOnInvoice !== false;
+  const showPhone = settings.showPhoneOnInvoice !== false;
+  const showTagline = settings.showTaglineOnInvoice !== false;
+  const showHeaderNote = settings.showHeaderNoteOnInvoice !== false;
+  const layoutStyle = settings.invoiceHeaderLayout || 'split';
 
-  // --- LOGO OR BRAND TEXT ---
-  let brandStartX = 14;
-  let textStartY = 20;
+  const primaryRgb = hexToRgb(settings.invoicePrimaryColor, [225, 29, 72]);
 
-  if (storeLogo) {
-    try {
-      if (storeLogo.startsWith('data:image/')) {
+  // --- TOP BRAND ACCENT BAR ---
+  doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+  doc.rect(0, 0, 210, 6, 'F');
+
+  let headerBottomY = 38;
+
+  if (layoutStyle === 'centered') {
+    let currentY = 12;
+
+    if (storeLogo && storeLogo.startsWith('data:image/')) {
+      try {
         const imageType = storeLogo.includes('image/png') ? 'PNG' : 'JPEG';
-        doc.addImage(storeLogo, imageType, 14, 12, 22, 22);
-        brandStartX = 40;
+        doc.addImage(storeLogo, imageType, 94, currentY, 22, 22);
+        currentY += 25;
+      } catch (e) {
+        console.warn('Could not render logo in Quotation PDF:', e);
       }
-    } catch (e) {
-      console.warn('Could not render logo in Quotation PDF:', e);
     }
-  }
 
-  // Store Brand Info
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(30, 27, 75); // Dark Slate
-  doc.text(storeName, brandStartX, textStartY + 2);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(17);
+    doc.setTextColor(30, 27, 75);
+    doc.text(storeName, 105, currentY + 2, { align: 'center' });
+    currentY += 6;
 
-  if (storeTagline) {
-    doc.setFont('helvetica', 'italic');
+    if (showTagline && storeTagline) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(120, 113, 108);
+      doc.text(storeTagline, 105, currentY, { align: 'center' });
+      currentY += 4;
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(87, 83, 78);
+    doc.text(storeAddress, 105, currentY, { align: 'center' });
+    currentY += 3.5;
+
+    const contactParts: string[] = [];
+    if (showPhone && storePhone) contactParts.push(`Tel: ${storePhone}`);
+    if (showEmail && storeEmail) contactParts.push(`Email: ${storeEmail}`);
+    if (contactParts.length > 0) {
+      doc.text(contactParts.join('  |  '), 105, currentY, { align: 'center' });
+      currentY += 3.5;
+    }
+
+    if (showHeaderNote && headerNote) {
+      doc.setFont('helvetica', 'bolditalic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+      doc.text(`"${headerNote}"`, 105, currentY, { align: 'center' });
+      currentY += 4;
+    }
+
+    currentY += 2;
+
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(14, currentY, 182, 9, 1.5, 1.5, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, currentY, 182, 9, 1.5, 1.5, 'S');
+
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(120, 113, 108);
-    doc.text(storeTagline, brandStartX, textStartY + 7);
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+    doc.text('PROFORMA INVOICE', 18, currentY + 6);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(30, 27, 75);
+    doc.text(`Quotation #: ${quotation.quotationNo}`, 85, currentY + 6, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(87, 83, 78);
+    doc.text(`Valid Until: ${formatDate(quotation.validUntil)}`, 150, currentY + 6);
+
+    headerBottomY = currentY + 12;
+  } else {
+    // --- SPLIT 2-COLUMN HEADER ---
+    let brandStartX = 14;
+    let currentLeftY = 14;
+    const maxLeftWidth = 98;
+
+    if (storeLogo && storeLogo.startsWith('data:image/')) {
+      try {
+        const imageType = storeLogo.includes('image/png') ? 'PNG' : 'JPEG';
+        doc.addImage(storeLogo, imageType, 14, 11, 20, 20);
+        brandStartX = 37;
+      } catch (e) {
+        console.warn('Could not render logo in Quotation PDF:', e);
+      }
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(30, 27, 75);
+    doc.text(storeName, brandStartX, currentLeftY + 1);
+    currentLeftY += 5.5;
+
+    if (showTagline && storeTagline) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(120, 113, 108);
+      const splitTag = doc.splitTextToSize(storeTagline, maxLeftWidth);
+      doc.text(splitTag, brandStartX, currentLeftY);
+      currentLeftY += splitTag.length * 3.2;
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(87, 83, 78);
+    const splitAddr = doc.splitTextToSize(storeAddress, maxLeftWidth);
+    doc.text(splitAddr, brandStartX, currentLeftY);
+    currentLeftY += splitAddr.length * 3.2;
+
+    if (showPhone && storePhone) {
+      doc.text(`Tel: ${storePhone}`, brandStartX, currentLeftY);
+      currentLeftY += 3.2;
+    }
+
+    if (showEmail && storeEmail) {
+      const splitEmail = doc.splitTextToSize(`Email: ${storeEmail}`, maxLeftWidth);
+      doc.text(splitEmail, brandStartX, currentLeftY);
+      currentLeftY += splitEmail.length * 3.2;
+    }
+
+    if (showHeaderNote && headerNote) {
+      doc.setFont('helvetica', 'bolditalic');
+      doc.setFontSize(7);
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+      const splitHeaderNote = doc.splitTextToSize(`"${headerNote}"`, maxLeftWidth);
+      doc.text(splitHeaderNote, brandStartX, currentLeftY);
+      currentLeftY += splitHeaderNote.length * 3.2;
+    }
+
+    // Right Column (Quotation Meta Box)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+    doc.text('PROFORMA INVOICE', 196, 15, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(30, 27, 75);
+    doc.text(`Quotation #: ${quotation.quotationNo}`, 196, 20.5, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(87, 83, 78);
+    doc.text(`Date Issued: ${formatDate(quotation.createdAt)}`, 196, 25.5, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+    doc.text(`Valid Until: ${formatDate(quotation.validUntil)}`, 196, 30.5, { align: 'right' });
+
+    headerBottomY = Math.max(currentLeftY, 34) + 4;
   }
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(87, 83, 78);
-  doc.text(`${storeAddress}  |  Tel: ${storePhone}${storeEmail ? `  |  ${storeEmail}` : ''}`, brandStartX, textStartY + 12);
-
-  // --- QUOTATION BADGE (Right aligned) ---
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.setTextColor(225, 29, 72); // Rose-600
-  doc.text('PROFORMA INVOICE', 196, 20, { align: 'right' });
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(30, 27, 75);
-  doc.text(`Quotation #: ${quotation.quotationNo}`, 196, 26, { align: 'right' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(87, 83, 78);
-  doc.text(`Date Issued: ${formatDate(quotation.createdAt)}`, 196, 31, { align: 'right' });
-  doc.setTextColor(225, 29, 72);
-  doc.text(`Valid Until: ${formatDate(quotation.validUntil)}`, 196, 36, { align: 'right' });
 
   // Divider Line
   doc.setDrawColor(229, 231, 235);
-  doc.setLineWidth(0.5);
-  doc.line(14, 41, 196, 41);
+  doc.setLineWidth(0.4);
+  doc.line(14, headerBottomY, 196, headerBottomY);
 
   // --- CLIENT DETAILS BOX ---
-  doc.setFillColor(250, 250, 249); // Stone-50
-  doc.roundedRect(14, 44, 182, 22, 2, 2, 'F');
+  const boxY = headerBottomY + 3;
+  doc.setFillColor(250, 250, 249);
+  doc.roundedRect(14, boxY, 182, 20, 2, 2, 'F');
   doc.setDrawColor(231, 229, 228);
-  doc.roundedRect(14, 44, 182, 22, 2, 2, 'S');
+  doc.roundedRect(14, boxY, 182, 20, 2, 2, 'S');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(168, 85, 247); // Purple
-  doc.text('BILL TO / CLIENT DETAILS', 18, 50);
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+  doc.text('BILL TO / CLIENT DETAILS', 18, boxY + 5.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
   doc.setTextColor(28, 25, 23);
   const customerName = quotation.customerName || 'Valued Customer';
-  doc.text(`Client Name: ${customerName}`, 18, 56);
+  doc.text(`Client Name: ${customerName}`, 18, boxY + 11);
 
   const customerPhone = quotation.customerPhone || 'Not provided';
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(68, 64, 60);
-  doc.text(`Phone / WhatsApp: ${customerPhone}`, 18, 61);
+  doc.text(`Phone / WhatsApp: ${customerPhone}`, 18, boxY + 16);
 
   // Additional Client Info
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(120, 113, 108);
-  doc.text('QUOTATION DETAILS', 120, 50);
+  doc.text('QUOTATION DETAILS', 120, boxY + 5.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(68, 64, 60);
   if (quotation.customerEmail) {
-    doc.text(`Email: ${quotation.customerEmail}`, 120, 56);
+    doc.text(`Email: ${quotation.customerEmail}`, 120, boxY + 11);
   } else {
-    doc.text(`Status: Pending Approval`, 120, 56);
+    doc.text(`Status: Pending Approval`, 120, boxY + 11);
   }
   if (quotation.customerAddress) {
-    doc.text(`Address: ${quotation.customerAddress}`, 120, 61);
+    doc.text(`Address: ${quotation.customerAddress}`, 120, boxY + 16);
   } else {
-    doc.text(`Validity: 14 Days from issue`, 120, 61);
+    doc.text(`Validity: 14 Days from issue`, 120, boxY + 16);
   }
 
   // --- ITEMS TABLE ---
@@ -133,21 +265,21 @@ export function buildQuotationPDFDoc(quotation: Quotation, settings: StoreSettin
   ]);
 
   autoTable(doc, {
-    startY: 70,
+    startY: boxY + 24,
     head: [['#', 'Item Description', 'SKU', 'Qty', 'Unit Price', 'Amount']],
     body: tableData,
     theme: 'grid',
     headStyles: {
-      fillColor: [225, 29, 72], // Rose-600
+      fillColor: primaryRgb,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 8.5,
+      fontSize: 8,
       halign: 'left',
     },
     styles: {
       font: 'helvetica',
-      fontSize: 8,
-      cellPadding: 2.8,
+      fontSize: 7.5,
+      cellPadding: 2.4,
       textColor: [28, 25, 23],
     },
     columnStyles: {
@@ -163,87 +295,104 @@ export function buildQuotationPDFDoc(quotation: Quotation, settings: StoreSettin
     },
   });
 
-  // Get Y position after table
   const finalY = (doc as any).lastAutoTable?.finalY || 135;
 
-  // --- FINANCIAL SUMMARY BOX (Right Aligned) ---
   const summaryX = 120;
   const summaryWidth = 76;
-  let currentY = finalY + 6;
+  let currentSummaryY = finalY + 5;
+  let leftSideY = finalY + 5;
 
-  // Notes if any (Left side)
   if (quotation.notes) {
     doc.setFillColor(254, 242, 242);
-    doc.roundedRect(14, currentY, 95, 20, 2, 2, 'F');
+    doc.roundedRect(14, leftSideY, 95, 16, 2, 2, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(225, 29, 72);
-    doc.text('Quotation Notes / Remarks:', 18, currentY + 6);
+    doc.setFontSize(7.5);
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+    doc.text('Quotation Remarks:', 18, leftSideY + 5);
     doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(87, 83, 78);
     const splitNote = doc.splitTextToSize(quotation.notes, 87);
-    doc.text(splitNote, 18, currentY + 12);
+    doc.text(splitNote, 18, leftSideY + 10);
+    leftSideY += 19;
   }
 
-  // Summary Lines
+  if (bankDetails) {
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(14, leftSideY, 95, 20, 2, 2, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, leftSideY, 95, 20, 2, 2, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(30, 27, 75);
+    doc.text('Bank Transfer & Payment Details:', 18, leftSideY + 5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105);
+    const splitBank = doc.splitTextToSize(bankDetails, 87);
+    doc.text(splitBank, 18, leftSideY + 10);
+    leftSideY += 23;
+  }
+
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(87, 83, 78);
 
   // Subtotal
-  doc.text('Subtotal:', summaryX, currentY);
-  doc.text(formatCurrency(quotation.subtotal, currency), 196, currentY, { align: 'right' });
-  currentY += 5;
+  doc.text('Subtotal:', summaryX, currentSummaryY);
+  doc.text(formatCurrency(quotation.subtotal, currency), 196, currentSummaryY, { align: 'right' });
+  currentSummaryY += 4.5;
 
   // Discount
   if (quotation.discountAmount > 0) {
-    doc.setTextColor(225, 29, 72);
-    doc.text(`Discount (${quotation.discountType === 'PERCENTAGE' ? `${quotation.discountValue}%` : 'Fixed'}):`, summaryX, currentY);
-    doc.text(`-${formatCurrency(quotation.discountAmount, currency)}`, 196, currentY, { align: 'right' });
-    currentY += 5;
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+    doc.text(`Discount (${quotation.discountType === 'PERCENTAGE' ? `${quotation.discountValue}%` : 'Fixed'}):`, summaryX, currentSummaryY);
+    doc.text(`-${formatCurrency(quotation.discountAmount, currency)}`, 196, currentSummaryY, { align: 'right' });
+    currentSummaryY += 4.5;
     doc.setTextColor(87, 83, 78);
   }
 
   // Tax
   if (quotation.taxAmount > 0) {
-    doc.text(`Tax (${(quotation.taxRate * 100).toFixed(0)}%):`, summaryX, currentY);
-    doc.text(formatCurrency(quotation.taxAmount, currency), 196, currentY, { align: 'right' });
-    currentY += 5;
+    doc.text(`Tax (${(quotation.taxRate * 100).toFixed(0)}%):`, summaryX, currentSummaryY);
+    doc.text(formatCurrency(quotation.taxAmount, currency), 196, currentSummaryY, { align: 'right' });
+    currentSummaryY += 4.5;
   }
 
   // Grand Total Box
-  doc.setFillColor(225, 29, 72); // Rose-600
-  doc.roundedRect(summaryX - 2, currentY, summaryWidth, 9.5, 2, 2, 'F');
+  doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+  doc.roundedRect(summaryX - 2, currentSummaryY, summaryWidth, 9, 2, 2, 'F');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
+  doc.setFontSize(9.5);
   doc.setTextColor(255, 255, 255);
-  doc.text('ESTIMATED TOTAL:', summaryX + 2, currentY + 6.5);
-  doc.text(formatCurrency(quotation.totalAmount, currency), 194, currentY + 6.5, { align: 'right' });
-  currentY += 16;
+  doc.text('ESTIMATED TOTAL:', summaryX + 2, currentSummaryY + 6);
+  doc.text(formatCurrency(quotation.totalAmount, currency), 194, currentSummaryY + 6, { align: 'right' });
+  currentSummaryY += 14;
 
   // --- TERMS & CONDITIONS BOX ---
-  const termsY = Math.max(currentY, 220);
-  doc.setFillColor(254, 243, 199); // Amber-100
-  doc.roundedRect(14, termsY, 182, 22, 2, 2, 'F');
+  const termsY = Math.max(currentSummaryY + 2, leftSideY + 2, 215);
+  doc.setFillColor(254, 243, 199);
+  doc.roundedRect(14, termsY, 182, 20, 2, 2, 'F');
   doc.setDrawColor(251, 191, 36);
-  doc.roundedRect(14, termsY, 182, 22, 2, 2, 'S');
+  doc.roundedRect(14, termsY, 182, 20, 2, 2, 'S');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(180, 83, 9); // Amber-700
-  doc.text('TERMS & CONDITIONS:', 18, termsY + 5.5);
+  doc.setFontSize(7.5);
+  doc.setTextColor(180, 83, 9);
+  doc.text('TERMS & CONDITIONS:', 18, termsY + 5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(120, 53, 15);
-  doc.text('1. This quotation is valid for 14 days from date of issue.', 18, termsY + 10.5);
-  doc.text('2. Prices are subject to change without prior notice and based on stock availability.', 18, termsY + 15);
-  doc.text('3. This proforma invoice is an estimate and does not reserve inventory until payment confirmation.', 18, termsY + 19.5);
+  doc.text('1. This quotation is valid for 14 days from date of issue.', 18, termsY + 9.5);
+  doc.text('2. Prices are subject to change without prior notice and based on stock availability.', 18, termsY + 13.5);
+  doc.text('3. This proforma invoice is an estimate and does not reserve inventory until payment confirmation.', 18, termsY + 17.5);
 
   // --- SIGNATURES ---
-  const signY = 258;
+  const signY = 252;
   doc.setDrawColor(209, 213, 219);
   doc.setLineWidth(0.4);
   doc.line(20, signY, 80, signY);
@@ -256,7 +405,7 @@ export function buildQuotationPDFDoc(quotation: Quotation, settings: StoreSettin
   doc.text('Customer Acceptance (Sign & Date)', 160, signY + 4, { align: 'center' });
 
   // --- FOOTER NOTE ---
-  const footerY = 275;
+  const footerY = 272;
   doc.setDrawColor(229, 231, 235);
   doc.line(14, footerY, 196, footerY);
 

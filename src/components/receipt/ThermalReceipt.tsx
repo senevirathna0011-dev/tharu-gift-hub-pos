@@ -23,9 +23,13 @@ export default function ThermalReceipt({
   const storeEmail = settings.email || '';
   const storeLogo = settings.shopLogo;
   const showLogo = settings.showLogoOnReceipt !== false && !!storeLogo;
+  const showTagline = settings.showTaglineOnInvoice !== false;
+  const showPhone = settings.showPhoneOnInvoice !== false;
+  const showEmail = settings.showEmailOnInvoice !== false;
+  const showHeaderNote = settings.showHeaderNoteOnInvoice !== false;
   const headerNote = settings.headerNote;
   const receiptFooter = settings.footerNote || settings.receiptFooter || 'Thank you for shopping with us! Visit again. ✨';
-  const receiptNote = settings.receiptNote || 'Items in original condition can be exchanged within 14 days with this receipt.';
+  const receiptNote = settings.invoiceTerms || settings.receiptNote || 'Items in original condition can be exchanged within 14 days with this receipt.';
   const currency = settings.currencySymbol || '$';
 
   const cashier = cashierNameOverride || sale.cashierName || 'Cashier';
@@ -53,15 +57,15 @@ export default function ThermalReceipt({
         <div className="text-[13px] font-extrabold tracking-wider uppercase leading-snug">
           {storeName}
         </div>
-        {storeTagline && (
+        {showTagline && storeTagline && (
           <div className="text-[8.5px] text-stone-600 italic mt-0.5 leading-tight">
             {storeTagline}
           </div>
         )}
         <div className="text-[9.5px] text-stone-800 mt-0.5">{storeAddress}</div>
-        <div className="text-[9.5px] text-stone-800">Tel: {storePhone}</div>
-        {storeEmail && <div className="text-[8.5px] text-stone-700">{storeEmail}</div>}
-        {headerNote && (
+        {showPhone && storePhone && <div className="text-[9.5px] text-stone-800">Tel: {storePhone}</div>}
+        {showEmail && storeEmail && <div className="text-[8.5px] text-stone-700">{storeEmail}</div>}
+        {showHeaderNote && headerNote && (
           <div className="text-[9px] font-semibold text-stone-900 mt-1 italic">
             {headerNote}
           </div>
