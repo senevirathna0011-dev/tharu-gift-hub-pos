@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import { CartItem, DiscountType, Customer } from '@/lib/types';
 import { useSettings } from '@/context/SettingsContext';
 import { 
@@ -10,7 +10,6 @@ import {
   ShoppingBag, 
   Percent, 
   User, 
-  UserPlus, 
   ArrowRight,
   Sparkles,
   Award,
@@ -19,6 +18,112 @@ import {
   Phone,
   ShieldCheck
 } from 'lucide-react';
+
+interface CartItemRowProps {
+  item: CartItem;
+  onUpdateQuantity: (productId: string, quantity: number) => void;
+  onRemoveItem: (productId: string) => void;
+  formatMoney: (amount: number) => string;
+}
+
+const CartItemRow = memo(function CartItemRow({
+  item,
+  onUpdateQuantity,
+  onRemoveItem,
+  formatMoney,
+}: CartItemRowProps) {
+  const handleDecrement = useCallback(() => {
+    onUpdateQuantity(item.product.id, item.quantity - 1);
+  }, [item.product.id, item.quantity, onUpdateQuantity]);
+
+  const handleIncrement = useCallback(() => {
+    onUpdateQuantity(item.product.id, item.quantity + 1);
+  }, [item.product.id, item.quantity, onUpdateQuantity]);
+
+  const handleRemove = useCallback(() => {
+    onRemoveItem(item.product.id);
+  }, [item.product.id, onRemoveItem]);
+
+  const isMaxStock = item.quantity >= item.product.stockQuantity;
+  const itemTotal = item.product.sellingPrice * item.quantity;
+  const imageUrl = item.product.image || item.product.imageUrl;
+
+  return (
+    <div className="flex items-center gap-3 p-2.5 rounded-xl border border-stone-200/80 hover:border-rose-200 bg-white transition-all">
+      {/* Image / Thumbnail */}
+      <div className="w-12 h-12 rounded-lg bg-stone-100 overflow-hidden shrink-0 flex items-center justify-center">
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt={item.product.name}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <Sparkles className="w-5 h-5 text-pink-300" />
+        )}
+      </div>
+
+      {/* Title & Unit Price & Warranty */}
+      <div className="flex-1 min-w-0">
+        <h4 className="text-xs font-semibold text-stone-900 truncate">
+          {item.product.name}
+        </h4>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-stone-500 font-mono">
+            {formatMoney(item.product.sellingPrice)} each
+          </span>
+          {item.product.warranty && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[9px] font-semibold border border-emerald-200/60">
+              <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+              <span>{item.product.warranty} Warranty</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Quantity Modifiers */}
+      <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-lg shrink-0">
+        <button
+          type="button"
+          onClick={handleDecrement}
+          className="w-5 h-5 rounded bg-white text-stone-700 hover:bg-stone-200 flex items-center justify-center transition-colors shadow-2xs text-xs font-bold cursor-pointer"
+          title="Decrease quantity"
+        >
+          <Minus className="w-3 h-3" />
+        </button>
+        <span className="w-6 text-center text-xs font-bold font-mono">
+          {item.quantity}
+        </span>
+        <button
+          type="button"
+          onClick={handleIncrement}
+          disabled={isMaxStock}
+          className="w-5 h-5 rounded bg-white text-stone-700 hover:bg-stone-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-2xs text-xs font-bold cursor-pointer"
+          title={isMaxStock ? 'Maximum stock reached' : 'Increase quantity'}
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+      </div>
+
+      {/* Item Total */}
+      <div className="text-right min-w-[60px] shrink-0">
+        <div className="text-xs font-bold text-stone-900 font-display">
+          {formatMoney(itemTotal)}
+        </div>
+        <button
+          type="button"
+          onClick={handleRemove}
+          className="text-[10px] text-stone-400 hover:text-rose-600 transition-colors cursor-pointer"
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  );
+});
 
 interface CartDrawerProps {
   cart: CartItem[];
@@ -40,7 +145,7 @@ interface CartDrawerProps {
   onGenerateQuotation: () => void;
 }
 
-export default function CartDrawer({
+const CartDrawer = memo(function CartDrawer({
   cart,
   onUpdateQuantity,
   onRemoveItem,
@@ -61,25 +166,35 @@ export default function CartDrawer({
 }: CartDrawerProps) {
   const { formatMoney, settings } = useSettings();
 
-  // Financial computations
-  const subtotal = cart.reduce((sum, item) => sum + item.product.sellingPrice * item.quantity, 0);
+  // Optimized financial computations
+  const { subtotal, totalItemsCount } = useMemo(() => {
+    let sub = 0;
+    let count = 0;
+    for (let i = 0; i < cart.length; i++) {
+      sub += cart[i].product.sellingPrice * cart[i].quantity;
+      count += cart[i].quantity;
+    }
+    return { subtotal: sub, totalItemsCount: count };
+  }, [cart]);
 
-  let discountAmount = 0;
-  if (discountType === 'PERCENTAGE' && discountValue > 0) {
-    discountAmount = +(subtotal * (discountValue / 100)).toFixed(2);
-  } else if (discountType === 'FIXED' && discountValue > 0) {
-    discountAmount = Math.min(subtotal, discountValue);
-  }
+  const discountAmount = useMemo(() => {
+    if (discountType === 'PERCENTAGE' && discountValue > 0) {
+      return +(subtotal * (discountValue / 100)).toFixed(2);
+    }
+    if (discountType === 'FIXED' && discountValue > 0) {
+      return Math.min(subtotal, discountValue);
+    }
+    return 0;
+  }, [subtotal, discountType, discountValue]);
 
   const discountedSubtotal = Math.max(0, subtotal - discountAmount);
   const taxAmount = +(discountedSubtotal * taxRate).toFixed(2);
   const totalAmount = +(discountedSubtotal + taxAmount).toFixed(2);
-  const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50/70">
+      <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50/70 shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-pink-100 text-pink-700 flex items-center justify-center font-bold text-sm">
             {totalItemsCount}
@@ -92,8 +207,9 @@ export default function CartDrawer({
 
         {cart.length > 0 && (
           <button
+            type="button"
             onClick={onClearCart}
-            className="text-xs text-stone-500 hover:text-rose-600 flex items-center gap-1 font-medium transition-colors"
+            className="text-xs text-stone-500 hover:text-rose-600 flex items-center gap-1 font-medium transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Clear</span>
@@ -102,7 +218,7 @@ export default function CartDrawer({
       </div>
 
       {/* Customer Bar: Selectable or Quick-add with Phone Number */}
-      <div className="px-3.5 py-2.5 bg-stone-50/90 border-b border-stone-200 text-xs space-y-2">
+      <div className="px-3.5 py-2.5 bg-stone-50/90 border-b border-stone-200 text-xs space-y-2 shrink-0">
         {selectedCustomer ? (
           <div className="flex items-center justify-between w-full bg-white p-2.5 rounded-xl border border-rose-200 shadow-2xs">
             <div className="flex items-center gap-2 min-w-0">
@@ -130,14 +246,14 @@ export default function CartDrawer({
               <button
                 type="button"
                 onClick={onOpenCustomerSelect}
-                className="text-[11px] text-rose-600 hover:underline font-bold px-1"
+                className="text-[11px] text-rose-600 hover:underline font-bold px-1 cursor-pointer"
               >
                 Change
               </button>
               <button
                 type="button"
                 onClick={onClearCustomer}
-                className="p-1 text-stone-400 hover:text-rose-600 rounded-md hover:bg-stone-100 transition-colors"
+                className="p-1 text-stone-400 hover:text-rose-600 rounded-md hover:bg-stone-100 transition-colors cursor-pointer"
                 title="Remove customer (revert to Walk-in)"
               >
                 <X className="w-3.5 h-3.5" />
@@ -150,7 +266,7 @@ export default function CartDrawer({
               <button
                 type="button"
                 onClick={onOpenCustomerSelect}
-                className="flex-1 flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white hover:bg-rose-50/50 border border-stone-200 hover:border-rose-200 transition-all text-left group"
+                className="flex-1 flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white hover:bg-rose-50/50 border border-stone-200 hover:border-rose-200 transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-1.5 text-stone-600 group-hover:text-stone-900 min-w-0">
                   <User className="w-3.5 h-3.5 text-stone-400 group-hover:text-rose-600 shrink-0" />
@@ -179,7 +295,7 @@ export default function CartDrawer({
                 <button
                   type="button"
                   onClick={() => onCustomerPhoneChange('')}
-                  className="absolute right-2 text-stone-400 hover:text-stone-600 p-0.5"
+                  className="absolute right-2 text-stone-400 hover:text-stone-600 p-0.5 cursor-pointer"
                   title="Clear phone"
                 >
                   <X className="w-3 h-3" />
@@ -204,82 +320,20 @@ export default function CartDrawer({
           </div>
         ) : (
           cart.map((item) => (
-            <div
+            <CartItemRow
               key={item.product.id}
-              className="flex items-center gap-3 p-2.5 rounded-xl border border-stone-200/80 hover:border-rose-200 bg-white transition-all"
-            >
-              {/* Image / Thumbnail */}
-              <div className="w-12 h-12 rounded-lg bg-stone-100 overflow-hidden shrink-0 flex items-center justify-center">
-                {(item.product.image || item.product.imageUrl) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={(item.product.image || item.product.imageUrl)!}
-                    alt={item.product.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <Sparkles className="w-5 h-5 text-pink-300" />
-                )}
-              </div>
-
-              {/* Title & Unit Price & Warranty */}
-              <div className="flex-1 min-w-0">
-                <h4 className="text-xs font-semibold text-stone-900 truncate">
-                  {item.product.name}
-                </h4>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-stone-500 font-mono">
-                    {formatMoney(item.product.sellingPrice)} each
-                  </span>
-                  {item.product.warranty && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[9px] font-semibold border border-emerald-200/60">
-                      <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
-                      <span>{item.product.warranty} Warranty</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Quantity Modifiers */}
-              <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-lg">
-                <button
-                  onClick={() => onUpdateQuantity(item.product.id, item.quantity - 1)}
-                  className="w-5 h-5 rounded bg-white text-stone-700 hover:bg-stone-200 flex items-center justify-center transition-colors shadow-2xs text-xs font-bold"
-                >
-                  <Minus className="w-3 h-3" />
-                </button>
-                <span className="w-6 text-center text-xs font-bold font-mono">
-                  {item.quantity}
-                </span>
-                <button
-                  onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
-                  disabled={item.quantity >= item.product.stockQuantity}
-                  className="w-5 h-5 rounded bg-white text-stone-700 hover:bg-stone-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-2xs text-xs font-bold"
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
-              </div>
-
-              {/* Item Total */}
-              <div className="text-right min-w-[60px]">
-                <div className="text-xs font-bold text-stone-900 font-display">
-                  {formatMoney(item.product.sellingPrice * item.quantity)}
-                </div>
-                <button
-                  onClick={() => onRemoveItem(item.product.id)}
-                  className="text-[10px] text-stone-400 hover:text-rose-600 transition-colors"
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
+              item={item}
+              onUpdateQuantity={onUpdateQuantity}
+              onRemoveItem={onRemoveItem}
+              formatMoney={formatMoney}
+            />
           ))
         )}
       </div>
 
       {/* Cart Summary & Checkout / Quotation Footer */}
       {cart.length > 0 && (
-        <div className="p-4 bg-stone-50 border-t border-stone-200 space-y-3">
+        <div className="p-4 bg-stone-50 border-t border-stone-200 space-y-3 shrink-0">
           {/* Quick Discounts & Tax Buttons */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
@@ -296,8 +350,9 @@ export default function CartDrawer({
                 ].map((d) => (
                   <button
                     key={d.label}
+                    type="button"
                     onClick={() => onApplyDiscount(d.type, d.val)}
-                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-md border transition-all ${
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-md border transition-all cursor-pointer ${
                       discountType === d.type && (d.val === 0 || discountValue === d.val)
                         ? 'bg-rose-600 text-white border-rose-600'
                         : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
@@ -317,7 +372,7 @@ export default function CartDrawer({
               <button
                 type="button"
                 onClick={onToggleTax}
-                className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-hidden ${
+                className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-hidden cursor-pointer ${
                   taxRate > 0 ? 'bg-rose-600' : 'bg-stone-300'
                 }`}
                 title={taxRate > 0 ? 'Tax is ON (Click to disable)' : 'Tax is OFF (Click to apply store tax)'}
@@ -362,7 +417,7 @@ export default function CartDrawer({
             <button
               type="button"
               onClick={onGenerateQuotation}
-              className="py-3 px-3 rounded-xl border border-stone-300 bg-white hover:bg-stone-100 active:scale-[0.99] text-stone-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs font-display"
+              className="py-3 px-3 rounded-xl border border-stone-300 bg-white hover:bg-stone-100 active:scale-[0.99] text-stone-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs font-display cursor-pointer"
               title="Convert cart items into a formal A4 quotation"
             >
               <FileText className="w-4 h-4 text-stone-500" />
@@ -372,7 +427,7 @@ export default function CartDrawer({
             <button
               type="button"
               onClick={onProceedToPayment}
-              className="py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-rose-600/30 transition-all font-display"
+              className="py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-rose-600/30 transition-all font-display cursor-pointer"
             >
               <span>Pay Now</span>
               <ArrowRight className="w-4 h-4" />
@@ -382,4 +437,6 @@ export default function CartDrawer({
       )}
     </div>
   );
-}
+});
+
+export default CartDrawer;

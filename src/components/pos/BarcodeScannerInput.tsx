@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
-import { Search, ScanLine, X } from 'lucide-react';
+import React, { useRef, useEffect, memo } from 'react';
+import { ScanLine, X } from 'lucide-react';
 
 interface BarcodeScannerInputProps {
   value: string;
@@ -10,7 +10,7 @@ interface BarcodeScannerInputProps {
   placeholder?: string;
 }
 
-export default function BarcodeScannerInput({
+const BarcodeScannerInput = memo(function BarcodeScannerInput({
   value,
   onChange,
   onEnterScan,
@@ -46,6 +46,7 @@ export default function BarcodeScannerInput({
       />
       {value && (
         <button
+          type="button"
           onClick={() => onChange('')}
           className="absolute right-3 p-1 text-stone-400 hover:text-stone-600 rounded-md hover:bg-stone-100 transition-colors"
         >
@@ -54,4 +55,6 @@ export default function BarcodeScannerInput({
       )}
     </div>
   );
-}
+});
+
+export default BarcodeScannerInput;

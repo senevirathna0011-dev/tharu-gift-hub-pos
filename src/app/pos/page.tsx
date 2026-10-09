@@ -20,17 +20,21 @@ import { useSettings } from '@/context/SettingsContext';
 import confetti from 'canvas-confetti';
 import { Clock, RotateCcw, Lock } from 'lucide-react';
 
+// In-memory product catalog cache for instant navigation & zero latency
+let cachedCatalog: Product[] | null = null;
+
 export default function POSPage() {
   const { toast } = useToast();
   const { currentUser, logout, openSwitchModal } = useAuth();
   const { settings } = useSettings();
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Initialize with cached catalog if available for instant 0ms mount
+  const [products, setProducts] = useState<Product[]>(() => cachedCatalog || []);
+  const [isLoading, setIsLoading] = useState<boolean>(() => !cachedCatalog);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  // Cart & Customer State
+  // Cart & Customer State (pure client-side)
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerName, setCustomerName] = useState<string>('');
@@ -52,11 +56,11 @@ export default function POSPage() {
   const [isReturnModalOpen, setIsReturnModalOpen] = useState<boolean>(false);
 
   // Customer Modals
-  const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
-  const [isNewCustomerOpen, setIsNewCustomerOpen] = useState(false);
+  const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState<boolean>(false);
+  const [isNewCustomerOpen, setIsNewCustomerOpen] = useState<boolean>(false);
 
   // Quotation Modal
-  const [isQuotationOpen, setIsQuotationOpen] = useState(false);
+  const [isQuotationOpen, setIsQuotationOpen] = useState<boolean>(false);
   const [generatedQuotation, setGeneratedQuotation] = useState<Quotation | null>(null);
 
   // POS Idle / Inactivity Screen Lock State (2 minutes timeout)
@@ -70,19 +74,22 @@ export default function POSPage() {
     },
   });
 
-  const handleUnlockScreen = () => {
+  const handleUnlockScreen = useCallback(() => {
     setIsScreenLocked(false);
     resetTimer();
     toast('POS Register unlocked! Ready for billing.', 'success');
-  };
+  }, [resetTimer, toast]);
 
-  // Fetch products
-  const fetchProducts = useCallback(async () => {
+  // Fetch product catalog and store in memory cache
+  const fetchProducts = useCallback(async (silent = false) => {
     try {
-      setIsLoading(true);
+      if (!silent && !cachedCatalog) {
+        setIsLoading(true);
+      }
       const res = await fetch('/api/products');
       const data = await res.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.products)) {
+        cachedCatalog = data.products;
         setProducts(data.products);
       } else {
         toast(data.error || 'Failed to load catalog', 'error');
@@ -95,81 +102,98 @@ export default function POSPage() {
   }, [toast]);
 
   useEffect(() => {
-    fetchProducts();
+    // Fetch fresh catalog on mount (silent if already populated from memory)
+    fetchProducts(!!cachedCatalog);
   }, [fetchProducts]);
 
-  // Extract categories
+  // Memoized O(1) product lookup maps
+  const productBySku = useMemo(() => {
+    const map = new Map<string, Product>();
+    for (let i = 0; i < products.length; i++) {
+      map.set(products[i].sku.toLowerCase(), products[i]);
+    }
+    return map;
+  }, [products]);
+
+  // Memoized categories extraction
   const categories = useMemo(() => {
     const cats = Array.from(new Set(products.map((p) => p.category)));
     return cats.sort();
   }, [products]);
 
-  // Filtered products
+  // Instant in-memory search and category filtering
   const filteredProducts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const isAllCategories = selectedCategory === 'All';
+
+    if (!query && isAllCategories) {
+      return products;
+    }
+
     return products.filter((p) => {
-      const matchesSearch =
-        searchQuery.trim() === '' ||
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = isAllCategories || p.category === selectedCategory;
+      if (!matchesCategory) return false;
 
-      const matchesCategory =
-        selectedCategory === 'All' || p.category === selectedCategory;
+      if (!query) return true;
 
-      return matchesSearch && matchesCategory;
+      return (
+        p.name.toLowerCase().includes(query) ||
+        p.sku.toLowerCase().includes(query) ||
+        p.category.toLowerCase().includes(query)
+      );
     });
   }, [products, searchQuery, selectedCategory]);
 
-  // Cart actions
-  const handleAddToCart = (product: Product) => {
+  // 100% Client-side instant cart state actions with stable useCallback references
+  const handleAddToCart = useCallback((product: Product) => {
     if (product.stockQuantity <= 0) {
       toast(`"${product.name}" is out of stock!`, 'error');
       return;
     }
 
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
+      const existingIndex = prev.findIndex((item) => item.product.id === product.id);
+      if (existingIndex >= 0) {
+        const existing = prev[existingIndex];
         if (existing.quantity >= product.stockQuantity) {
           toast(`Cannot add more than ${product.stockQuantity} units available.`, 'error');
           return prev;
         }
-        return prev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
+        const next = [...prev];
+        next[existingIndex] = { ...existing, quantity: existing.quantity + 1 };
+        return next;
       }
       return [...prev, { product, quantity: 1 }];
     });
 
     toast(`Added "${product.name}" to cart`, 'success');
-  };
+  }, [toast]);
 
-  const handleUpdateQuantity = (productId: string, newQty: number) => {
+  const handleUpdateQuantity = useCallback((productId: string, newQty: number) => {
     if (newQty <= 0) {
-      handleRemoveItem(productId);
+      setCart((prev) => prev.filter((item) => item.product.id !== productId));
       return;
     }
 
-    const target = products.find((p) => p.id === productId);
-    if (target && newQty > target.stockQuantity) {
-      toast(`Only ${target.stockQuantity} units available in stock`, 'error');
-      return;
-    }
+    setCart((prev) => {
+      const existingIndex = prev.findIndex((item) => item.product.id === productId);
+      if (existingIndex === -1) return prev;
+      const existing = prev[existingIndex];
+      if (newQty > existing.product.stockQuantity) {
+        toast(`Only ${existing.product.stockQuantity} units available in stock`, 'error');
+        return prev;
+      }
+      const next = [...prev];
+      next[existingIndex] = { ...existing, quantity: newQty };
+      return next;
+    });
+  }, [toast]);
 
-    setCart((prev) =>
-      prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity: newQty } : item
-      )
-    );
-  };
-
-  const handleRemoveItem = (productId: string) => {
+  const handleRemoveItem = useCallback((productId: string) => {
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
-  };
+  }, []);
 
-  const handleClearCart = () => {
+  const handleClearCart = useCallback(() => {
     setCart([]);
     setDiscountType('NONE');
     setDiscountValue(0);
@@ -177,22 +201,24 @@ export default function POSPage() {
     setSelectedCustomer(null);
     setCustomerName('');
     setCustomerPhone('');
-  };
+  }, []);
 
-  // Barcode enter scan
-  const handleBarcodeEnterScan = (term: string) => {
-    const exactSkuMatch = products.find(
-      (p) => p.sku.toLowerCase() === term.toLowerCase()
-    );
+  // Instant barcode scanner enter handler (O(1) SKU lookup first)
+  const handleBarcodeEnterScan = useCallback((term: string) => {
+    const clean = term.trim().toLowerCase();
+    if (!clean) return;
 
+    // 1. O(1) Instant exact SKU match
+    const exactSkuMatch = productBySku.get(clean);
     if (exactSkuMatch) {
       handleAddToCart(exactSkuMatch);
       setSearchQuery('');
       return;
     }
 
-    const nameMatch = products.find((p) =>
-      p.name.toLowerCase().includes(term.toLowerCase())
+    // 2. Fallback to searching name or partial SKU in memory
+    const nameMatch = products.find(
+      (p) => p.sku.toLowerCase().includes(clean) || p.name.toLowerCase().includes(clean)
     );
 
     if (nameMatch) {
@@ -201,27 +227,48 @@ export default function POSPage() {
     } else {
       toast(`No product found with barcode or name: "${term}"`, 'error');
     }
-  };
+  }, [productBySku, products, handleAddToCart, toast]);
 
-  // Compute total for payment
-  const subtotal = cart.reduce(
-    (sum, item) => sum + item.product.sellingPrice * item.quantity,
-    0
-  );
+  // Stable callbacks for customer & cart options
+  const handleApplyDiscount = useCallback((type: DiscountType, val: number) => {
+    setDiscountType(type);
+    setDiscountValue(val);
+  }, []);
 
-  let discountAmount = 0;
-  if (discountType === 'PERCENTAGE' && discountValue > 0) {
-    discountAmount = +(subtotal * (discountValue / 100)).toFixed(2);
-  } else if (discountType === 'FIXED' && discountValue > 0) {
-    discountAmount = Math.min(subtotal, discountValue);
-  }
+  const handleToggleTax = useCallback(() => {
+    setTaxRate((prev) => (prev > 0 ? 0 : (settings.taxRate || 0.08)));
+  }, [settings.taxRate]);
 
-  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
-  const taxAmount = +(discountedSubtotal * taxRate).toFixed(2);
-  const grandTotal = +(discountedSubtotal + taxAmount).toFixed(2);
+  const handleOpenCustomerSelect = useCallback(() => {
+    setIsCustomerSelectOpen(true);
+  }, []);
+
+  const handleClearCustomer = useCallback(() => {
+    setSelectedCustomer(null);
+    setCustomerName('');
+    setCustomerPhone('');
+  }, []);
+
+  const handleProceedToPayment = useCallback(() => {
+    setIsPaymentOpen(true);
+  }, []);
+
+  // Compute total for payment modal
+  const grandTotal = useMemo(() => {
+    const subtotal = cart.reduce((sum, item) => sum + item.product.sellingPrice * item.quantity, 0);
+    let discountAmount = 0;
+    if (discountType === 'PERCENTAGE' && discountValue > 0) {
+      discountAmount = +(subtotal * (discountValue / 100)).toFixed(2);
+    } else if (discountType === 'FIXED' && discountValue > 0) {
+      discountAmount = Math.min(subtotal, discountValue);
+    }
+    const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+    const taxAmount = +(discountedSubtotal * taxRate).toFixed(2);
+    return +(discountedSubtotal + taxAmount).toFixed(2);
+  }, [cart, discountType, discountValue, taxRate]);
 
   // Complete checkout
-  const handleCompleteSale = async (
+  const handleCompleteSale = useCallback(async (
     paymentMethod: PaymentMethod,
     amountPaid: number,
     notes?: string,
@@ -274,8 +321,8 @@ export default function POSPage() {
         setIsPaymentOpen(false);
         setIsReceiptOpen(true);
         handleClearCart();
-        // Refresh catalog stocks
-        fetchProducts();
+        // Refresh catalog stocks in the background
+        fetchProducts(true);
       } else {
         toast(data.error || 'Failed to process transaction', 'error');
       }
@@ -284,10 +331,22 @@ export default function POSPage() {
     } finally {
       setIsProcessingSale(false);
     }
-  };
+  }, [
+    cart,
+    selectedCustomer,
+    customerName,
+    customerPhone,
+    currentUser,
+    discountType,
+    discountValue,
+    taxRate,
+    toast,
+    handleClearCart,
+    fetchProducts
+  ]);
 
   // Generate Quotation / Proforma Invoice
-  const handleGenerateQuotation = async () => {
+  const handleGenerateQuotation = useCallback(async () => {
     if (cart.length === 0) {
       toast('Cart is empty. Add products to generate quotation.', 'error');
       return;
@@ -329,10 +388,10 @@ export default function POSPage() {
     } catch (err) {
       toast('Network error creating quotation', 'error');
     }
-  };
+  }, [cart, selectedCustomer, customerName, customerPhone, discountType, discountValue, taxRate, toast]);
 
   // Quick register customer from POS
-  const handleQuickRegisterCustomer = async (data: Partial<Customer>): Promise<boolean> => {
+  const handleQuickRegisterCustomer = useCallback(async (data: Partial<Customer>): Promise<boolean> => {
     try {
       const res = await fetch('/api/customers', {
         method: 'POST',
@@ -354,7 +413,7 @@ export default function POSPage() {
       toast('Network error registering customer', 'error');
       return false;
     }
-  };
+  }, [toast]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 h-[calc(100vh-4rem)] flex flex-col">
@@ -375,7 +434,7 @@ export default function POSPage() {
             <button
               type="button"
               onClick={() => setIsShiftModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 text-xs font-bold transition-all shadow-2xs shrink-0 font-display"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 text-xs font-bold transition-all shadow-2xs shrink-0 font-display cursor-pointer"
               title="View your sales stats for today's shift"
             >
               <Clock className="w-4 h-4 text-pink-600" />
@@ -387,7 +446,7 @@ export default function POSPage() {
             <button
               type="button"
               onClick={() => setIsReturnModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 text-stone-700 hover:text-rose-700 text-xs font-bold transition-all shadow-2xs shrink-0 font-display"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 text-stone-700 hover:text-rose-700 text-xs font-bold transition-all shadow-2xs shrink-0 font-display cursor-pointer"
               title="Process a customer return and refund voucher"
             >
               <RotateCcw className="w-4 h-4 text-rose-600" />
@@ -408,7 +467,7 @@ export default function POSPage() {
             </button>
           </div>
 
-          {/* Catalog Grid */}
+          {/* Catalog Grid (Memoized - does NOT re-render when cart state changes) */}
           <div className="flex-1 min-h-0">
             <ProductCatalog
               products={filteredProducts}
@@ -432,21 +491,14 @@ export default function POSPage() {
             customerName={customerName}
             customerPhone={customerPhone}
             onCustomerPhoneChange={setCustomerPhone}
-            onOpenCustomerSelect={() => setIsCustomerSelectOpen(true)}
-            onClearCustomer={() => {
-              setSelectedCustomer(null);
-              setCustomerName('');
-              setCustomerPhone('');
-            }}
+            onOpenCustomerSelect={handleOpenCustomerSelect}
+            onClearCustomer={handleClearCustomer}
             discountType={discountType}
             discountValue={discountValue}
-            onApplyDiscount={(type, val) => {
-              setDiscountType(type);
-              setDiscountValue(val);
-            }}
+            onApplyDiscount={handleApplyDiscount}
             taxRate={taxRate}
-            onToggleTax={() => setTaxRate((prev) => (prev > 0 ? 0 : (settings.taxRate || 0.08)))}
-            onProceedToPayment={() => setIsPaymentOpen(true)}
+            onToggleTax={handleToggleTax}
+            onProceedToPayment={handleProceedToPayment}
             onGenerateQuotation={handleGenerateQuotation}
           />
         </div>
@@ -517,7 +569,7 @@ export default function POSPage() {
         isOpen={isReturnModalOpen}
         onClose={() => setIsReturnModalOpen(false)}
         onReturnProcessed={() => {
-          fetchProducts();
+          fetchProducts(true);
         }}
       />
 
